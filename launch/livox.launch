@@ -1,0 +1,46 @@
+<launch>
+    
+    <param name="scan_line" type="int" value="16" />
+    <param name="lidar_type" type="string" value="livox" />
+    <!-- if 1, do mapping 10 Hz, if 2, do mapping 5 Hz. Suggest to use 1, it will adjust frequence automaticlly -->
+    <param name="mapping_skip_frame" type="int" value="1" />
+    <param name="mapping_init_accumulate_frames" type="int" value="50" />
+
+    <!--Debug save file option-->
+    <param name="if_save_to_pcd_files" type="int" value="0" />
+    <param name="pcd_save_dir" type="string" value="$(env HOME)/Loam_livox_pcd" />
+    <param name="log_save_dir" type="string" value="$(env HOME)/Loam_livox_log" />
+    <!--Parameters for feature extraction-->
+    <param name="mapping_line_resolution" type="double" value="0.1"/>
+    <param name="mapping_plane_resolution" type="double" value="0.4"/>
+    <param name="livox_min_sigma" type="double" value="7e-4"/>
+    <param name="livox_min_dis" type="double" value="1.0"/>
+    <param name="corner_curvature" type="double" value="0.02"/>
+    <param name="surface_curvature" type="double" value="0.001"/>
+    <param name="minimum_view_angle" type="double" value="5"/>
+    <!--Parameters for optimization-->
+    <param name="max_allow_incre_R" type="double" value="20.0"/>
+    <param name="max_allow_incre_T" type="double" value="0.2"/>
+    <param name="max_allow_final_cost" type="double" value="1.0"/>
+    <param name="icp_maximum_iteration" type="int" value="6"/>
+    <param name="ceres_maximum_iteration" type="int" value="100"/>
+
+    <param name="if_motion_deblur" type="int" value="0"/>
+    <param name="odom_mode" type="int" value="0"/>   <!--0 = odom, 1 = mapping-->
+    <param name="maximum_mapping_buffer" type="int" value="2"/>
+
+
+    <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration" output="screen" >
+     <remap from="/laser_points" to="/livox/lidar" />
+    </node>
+
+    <!-- <node pkg="livox_loam" type="livox_laserOdometry" name="livox_laserOdometry" output="screen" /> -->
+
+    <node pkg="loam_livox" type="livox_laserMapping" name="livox_laserMapping" output="screen" />
+
+    <arg name="rviz" default="true" />
+    <group if="$(arg rviz)">
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find loam_livox)/rviz_cfg/rosbag.rviz" />
+    </group>
+
+</launch>
