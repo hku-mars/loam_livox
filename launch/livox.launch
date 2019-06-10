@@ -40,7 +40,7 @@
 
     <arg name="rviz" default="true" />
     <group if="$(arg rviz)">
-        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find loam_livox)/rviz_cfg/rosbag.rviz" />
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find loam_livox)/rviz_cfg/livox.rviz" />
     </group>
 
 </launch>

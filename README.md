@@ -1,5 +1,5 @@
 # LOAM-Livox
-## A robust LiDAR Odemetry and Mapping (LOAM) package for Livox-LiDAR
+## A robust LiDAR Odemetry and Mapping (LOAM) package for Livox LiDAR
 
 <img src="https://github.com/hku-mars/loam_livox/blob/master/pics/demo_cyt.gif" width = 100% />
 
@@ -39,7 +39,7 @@ Connect to your PC to Livox LiDAR (mid-40) by following  [Livox-ros-driver insta
 ```
     roslaunch loam_livox livox.launch
 ```
-
+To improve the whole wise performance, we strongly recommend you to fresh your livox lidar with this [firmware](https://github.com/Livox-SDK/Special-Firmwares-for-Livox-LiDARs/tree/master/Threadlike-Noise_Filtering_Firmware_For_Livox_MID) by following this [tutorial](https://github.com/Livox-SDK/Special-Firmwares-for-Livox-LiDARs). 
 ## 4. Rosbag Example
 ### 4.1. **Common rosbag**
 Download [Our recorded rosbag](https://drive.google.com/drive/folders/1HWomWWPSEVvka2QVB2G41iRvSwIt5NWf?usp=sharing) and then
@@ -74,4 +74,6 @@ Thanks for LOAM(J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-
 ## 6. License
 The source code is released under [GPLv3](http://www.gnu.org/licenses/) license.
 
-We are still working on improving the performance and reliability of our codes. For any technical issues, please contact me via email Jiarong Lin < ziv.lin.ljr@gmail.com >.
+We are still working on improving the performance and reliability of our codes. For any technical issues, please contact me via email Jiarong Lin < ziv.lin.ljr@gmail.com >. 
+
+For commercial use, please contact Dr. Fu Zhang < fuzhang@hku.hk >
