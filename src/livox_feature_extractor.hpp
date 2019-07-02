@@ -243,7 +243,6 @@ class Livox_laser
                     {
                         pc_corners.points[ corner_num ] = m_raw_pts_vec[ i ];
                         //set_intensity( pc_corners.points[ corner_num ], e_I_motion_blur );
-                        //pc_corners.points[ corner_num ].intensity = float(m_pts_info_vec[ i ].idx + 1) /m_pts_info_vec.size();
                         pc_corners.points[ corner_num ].intensity = m_pts_info_vec[ i ].time_stamp;
                         corner_num++;
                     }
@@ -253,7 +252,6 @@ class Livox_laser
                     if ( m_pts_info_vec[ i ].depth_sq2 < std::pow( 1000, 2 ) )
                     {
                         pc_surface.points[ surface_num ] = m_raw_pts_vec[ i ];
-                        //pc_surface.points[ surface_num ].intensity = float(m_pts_info_vec[ i ].idx + 1) /m_pts_info_vec.size();
                         pc_surface.points[ surface_num ].intensity = float(m_pts_info_vec[ i ].time_stamp);
                         //set_intensity( pc_surface.points[ surface_num ], e_I_motion_blur );
                         surface_num++;
@@ -261,12 +259,11 @@ class Livox_laser
                 }
 
                 pc_full_res.points[ full_num ] = m_raw_pts_vec[ i ];
-                //pc_full_res.points[ full_num ].intensity = float( m_pts_info_vec[ i ].idx + 1 ) / m_pts_info_vec.size();
                 pc_full_res.points[ full_num ].intensity = m_pts_info_vec[ i ].time_stamp;
-                //set_intensity( pc_full_res.points[ full_num ] , e_I_motion_blur);
                 full_num++;
             }
         }
+
         //printf("Get_features , corner num = %d, suface num = %d, blur from %.2f~%.2f\r\n", corner_num, surface_num, minimum_blur, maximum_blur);
         pc_corners.resize(corner_num);
         pc_surface.resize(surface_num);
@@ -311,8 +308,6 @@ class Livox_laser
     {
         cv::Mat      res_img = img.clone();
         unsigned int pt_size = pt_list_eigen.size();
-        //int     m_img_height = img.rows;
-        //int     m_img_width = img.cols;
 
         for ( unsigned int idx = 0; idx < pt_size; idx++ )
         {
@@ -326,7 +321,6 @@ class Livox_laser
     {
 
         int idx = pt_infos->idx;
-        //cout << "Add mask, id  = " << pick_idx << "  type = " << pt_type <<endl;
         pt_infos->pt_type |= pt_type;
 
         if ( neighbor_count > 0 )
@@ -337,7 +331,6 @@ class Livox_laser
 
                 if ( i != 0 && ( idx >= 0 ) && ( idx < ( int ) m_pts_info_vec.size() ) )
                 {
-                    //assert( find_pt_info(  m_raw_pts_vec[idx] )->idx == idx); // make sure points order is no change, can be delete.
                     //cout << "Add mask, id  = " << idx << "  type = " << pt_type << endl;
                     m_pts_info_vec[ idx ].pt_type |= pt_type;
                 }
@@ -347,7 +340,6 @@ class Livox_laser
 
     void eval_point( Pt_infos *pt_info )
     {
-        //cout << "Eval depth: "<<depth2 << " ,intensity:  " << intensity << " ,min allow dis: " << m_livox_min_allow_dis << endl;
         if ( pt_info->depth_sq2 < m_livox_min_allow_dis * m_livox_min_allow_dis ) // to close
         {
             //cout << "Add mask, id  = " << idx << "  type = e_too_near" << endl;
@@ -370,6 +362,7 @@ class Livox_laser
         size_t       curvature_ssd_size = 2;
         int          critical_rm_point = e_pt_000 | e_pt_nan;
         float        neighbor_accumulate_xyz[ 3 ] = { 0.0, 0.0, 0.0 };
+
         //cout << "Surface_thr = " << thr_surface_curvature << " , corner_thr = " << thr_corner_curvature<< " ,minimum_view_angle = " << minimum_view_angle << endl;
         for ( size_t idx = curvature_ssd_size; idx < pts_size - curvature_ssd_size; idx++ )
         {
@@ -385,7 +378,6 @@ class Livox_laser
 
             for ( size_t i = 1; i <= curvature_ssd_size; i++ )
             {
-                // if(m_pts_info_vec[idx].is)
                 if ( ( m_pts_info_vec[ idx + i ].pt_type & e_pt_000 ) || ( m_pts_info_vec[ idx - i ].pt_type & e_pt_000 ) )
                 {
                     if ( i == 1 )
@@ -434,9 +426,8 @@ class Livox_laser
             Eigen::Matrix< float, 3, 1 > vec_b( m_raw_pts_vec[ idx + curvature_ssd_size ].x - m_raw_pts_vec[ idx - curvature_ssd_size ].x,
                                                 m_raw_pts_vec[ idx + curvature_ssd_size ].y - m_raw_pts_vec[ idx - curvature_ssd_size ].y,
                                                 m_raw_pts_vec[ idx + curvature_ssd_size ].z - m_raw_pts_vec[ idx - curvature_ssd_size ].z );
-            //vec_a = vec_a / vec_a.norm(); // avoid compute angle = nan
             m_pts_info_vec[ idx ].view_angle = Eigen_math::vector_angle( vec_a  , vec_b, 1 ) * 57.3;
-            //cout << vec_a.transpose() << "  " << vec_b.transpose() << " | ";
+
             //printf( "Idx = %d, angle = %.2f\r\n", idx,  m_pts_info_vec[ idx ].view_angle );
             if ( m_pts_info_vec[ idx ].view_angle > minimum_view_angle )
             {
@@ -447,7 +438,6 @@ class Livox_laser
                 }
 
                 float sq2_diff = 0.1;
-                //float edge_angle_diff = 10.0;
 
                 if ( m_pts_info_vec[ idx ].curvature > thr_corner_curvature )
                 // if ( abs( m_pts_info_vec[ idx ].view_angle - m_pts_info_vec[ idx + curvature_ssd_size ].view_angle ) > edge_angle_diff ||
@@ -574,8 +564,6 @@ class Livox_laser
 
         split_idx.push_back( pts_size - 1 );
 
-        // Spilt point into scans
-        // std::cout << "zero idx size = " << zero_idx.size() << " ---- " << edge_idx.size() << std::endl;
         int   val_index = 0;
         int   pt_angle_index = 0;
         float scan_angle = 0;
@@ -591,12 +579,6 @@ class Livox_laser
                 }
 
                 internal_size = split_idx[ val_index + 1 ] - split_idx[ val_index ];
-
-                /*if(internal_size < 100) // less than 100
-                    {
-                        idx = split_idx[ val_index ];
-                        continue;
-                    }*/
 
                 if ( m_pts_info_vec[ split_idx[ val_index + 1 ] ].polar_dis_sq2 > 10000 )
                 {

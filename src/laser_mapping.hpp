@@ -67,6 +67,7 @@
 #include "tools/pcl_tools.hpp"
 
 #define PUB_SURROUND_PTS 1
+#define PCD_SAVE_RAW 1
 #define PUB_DEBUG_INFO 1
 
 int slover_type = 1; // if 0, using solver in laserFactor.hpp
@@ -79,8 +80,8 @@ int g_if_undistore = 0;
 #define ICP_PLANE 1
 #define ICP_LINE 1
 int MOTION_DEBLUR = 0;
-#define CUBE_W 100.0 // 10
-#define CUBE_H 100.0 // 10
+#define CUBE_W 50.0 // 10
+#define CUBE_H 50.0 // 10
 #define CUBE_D 50.0 // 5
 
 #define BLUR_SCALE 1.0
@@ -139,9 +140,9 @@ class Laser_mapping
     float m_para_max_angular_rate = 200.0 / 50.0; // max angular rate = 90.0 /50.0 deg/s
     float m_para_max_speed = 100.0 / 50.0;        // max speed = 10 m/s
     float m_max_final_cost = 100.0;
-    int m_mapping_init_accumulate_frames = 100;
-    int m_kmean_filter_count = 3;
-    int m_kmean_filter_threshold = 2.0;
+    int   m_mapping_init_accumulate_frames = 100;
+    int   m_kmean_filter_count = 3;
+    int   m_kmean_filter_threshold = 2.0;
 
     int m_para_laser_cloud_center_width = CUBE_W;
     int m_para_laser_cloud_center_height = CUBE_H;
@@ -195,11 +196,7 @@ class Laser_mapping
     double m_para_buffer_RT_last[ 7 ] = { 0, 0, 0, 1, 0, 0, 0 };
     double m_para_buffer_incremental[ 7 ] = { 0, 0, 0, 1, 0, 0, 0 };
 
-    // wmap_T_odom * odom_T_curr = wmap_T_curr;
-    // transformation between odom's world and map's world frame
-
     const Eigen::Quaterniond m_q_I = Eigen::Quaterniond( 1, 0, 0, 0 );
-
 
     Eigen::Map<Eigen::Quaterniond> m_q_w_curr = Eigen::Map<Eigen::Quaterniond>( m_para_buffer_RT );
     Eigen::Map<Eigen::Vector3d>    m_t_w_curr = Eigen::Map<Eigen::Vector3d>( m_para_buffer_RT + 4 );
@@ -226,10 +223,10 @@ class Laser_mapping
     nav_msgs::Path m_laser_after_mapped_path;
 
     int       m_if_save_to_pcd_files = 1;
-    PCL_tools m_pcl_tools;
+    PCL_tools m_pcl_tools_aftmap;
+    PCL_tools m_pcl_tools_raw;
 
     File_logger m_file_logger;
-    //ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath;
 
     ros::Publisher  m_pub_laser_cloud_surround, m_pub_laser_cloud_map, m_pub_laser_cloud_full_res, m_pub_odom_aft_mapped, m_pub_odom_aft_mapped_hight_frec, m_pub_laser_aft_mapped_path;
     ros::NodeHandle m_ros_node_handle;
@@ -261,16 +258,11 @@ class Laser_mapping
         }
 
         init_parameters( m_ros_node_handle );
-        // m_sub_laser_cloud_corner_last = m_ros_node_handle.subscribe< sensor_msgs::PointCloud2 >( "/laser_cloud_sharp", 10000, &Laser_mapping::laserCloudCornerLastHandler, this );
-        //m_sub_laser_cloud_surf_last = m_ros_node_handle.subscribe< sensor_msgs::PointCloud2 >( "/laser_cloud_less_flat", 10000, &Laser_mapping::laserCloudSurfLastHandler, this );
-        // m_sub_laser_cloud_full_res = m_ros_node_handle.subscribe< sensor_msgs::PointCloud2 >( "/laser_points_2", 10000, &Laser_mapping::laserCloudFullResHandler, this );
 
         //livox_corners
         m_sub_laser_cloud_corner_last = m_ros_node_handle.subscribe<sensor_msgs::PointCloud2>( "/pc2_corners", 10000, &Laser_mapping::laserCloudCornerLastHandler, this );
         m_sub_laser_cloud_surf_last = m_ros_node_handle.subscribe<sensor_msgs::PointCloud2>( "/pc2_surface", 10000, &Laser_mapping::laserCloudSurfLastHandler, this );
         m_sub_laser_cloud_full_res = m_ros_node_handle.subscribe<sensor_msgs::PointCloud2>( "/pc2_full", 10000, &Laser_mapping::laserCloudFullResHandler, this );
-
-        // m_sub_laser_odom = m_ros_node_handle.subscribe< nav_msgs::Odometry >( "/laser_odom_to_init", 10000, &Laser_mapping::laserOdometryHandler, this );
 
         m_pub_laser_cloud_surround = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>( "/laser_cloud_surround", 10000 );
 #if PUB_DEBUG_INFO
@@ -329,6 +321,7 @@ class Laser_mapping
         nh.param<int>( "icp_maximum_iteration", m_para_icp_max_iterations, 20 );
         nh.param<int>( "ceres_maximum_iteration", m_para_cere_max_iterations, 20 );
         nh.param<int>( "if_motion_deblur", MOTION_DEBLUR, 1 );
+
         //MOTION_DEBLUR = 1;
         nh.param<float>( "max_allow_incre_R", m_para_max_angular_rate, 200.0 / 50.0 );
         nh.param<float>( "max_allow_incre_T", m_para_max_speed, 100.0 / 50.0 );
@@ -347,7 +340,8 @@ class Laser_mapping
         if ( m_if_save_to_pcd_files )
         {
             nh.param<std::string>( "pcd_save_dir", pcd_save_dir_name, std::string( "./" ) );
-            m_pcl_tools.set_save_dir_name( pcd_save_dir_name );
+            m_pcl_tools_aftmap.set_save_dir_name( pcd_save_dir_name );
+            m_pcl_tools_raw.set_save_dir_name( pcd_save_dir_name );
         }
 
         LOG_FILE_LINE( m_file_logger );
@@ -366,49 +360,31 @@ class Laser_mapping
     {
         for ( unsigned int i = 0; i < 3; i++ )
         {
-            // problem.SetParameterLowerBound( m_para_buffer_RT + 4, i, m_para_buffer_RT_last[ 4 + i ] - m_para_max_speed );
-            // problem.SetParameterUpperBound( m_para_buffer_RT + 4, i, m_para_buffer_RT_last[ 4 + i ] + m_para_max_speed );
+
             problem.SetParameterLowerBound( m_para_buffer_incremental + 4, i, -m_para_max_speed );
             problem.SetParameterUpperBound( m_para_buffer_incremental + 4, i, +m_para_max_speed );
         }
     }
 
-//    // set initial guess
-//    void transformAssociateToMap()
-//    {
-//        m_q_w_curr = m_q_w_odom * m_q_odom_curr;
-//        m_t_w_curr = m_q_w_odom * m_t_odom_curr + m_t_w_odom;
-//    }
-
-//    void transformUpdate()
-//    {
-//        m_q_w_odom = m_q_w_curr * m_q_odom_curr.inverse();
-//        m_t_w_odom = m_t_w_curr - m_q_w_odom * m_t_odom_curr;
-//    }
-
     void pointAssociateToMap( PointType const *const pi, PointType *const po, double interpolate_s = 1.0, int if_undistore = 0 )
     {
         Eigen::Vector3d point_curr( pi->x, pi->y, pi->z );
         Eigen::Vector3d point_w;
-        //if(  interpolate_s == 1.0 )
-        //if(if_undistore== 0 )
-        //if ( MOTION_DEBLUR == 0 || interpolate_s == 1.0 )
-        //if(1)
-        //if ( if_undistore == 0 || interpolate_s == 1.0 )
+
         if ( MOTION_DEBLUR == 0 || if_undistore == 0 || interpolate_s == 1.0 )
         {
             point_w = m_q_w_curr * point_curr + m_t_w_curr;
         }
         else
         {
-            // interpolate_s = interpolate_s*2;
+
             if ( interpolate_s > 1.0 || interpolate_s < 0.0 )
             {
                 //printf( "Input interpolate_s = %.5f\r\n", interpolate_s );
                 //assert( interpolate_s <= 1.0 && interpolate_s >= 0.0 );
             }
 
-            if ( 1 )
+            if ( 1 ) // Using rodrigues for fast compute.
             {
                 //https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
                 Eigen::Vector3d interpolate_T = m_t_w_incre * ( interpolate_s * BLUR_SCALE );
@@ -420,13 +396,8 @@ class Laser_mapping
             }
             else
             {
-                //interpolate_s *= 2.0;
-                //Eigen::Quaterniond interpolate_q =  m_q_I.slerp( 1.0, m_q_w_incre );
-                //Eigen::Vector3d    interpolate_T = m_t_w_incre * ( 1.0 );
-
                 Eigen::Quaterniond interpolate_q = m_q_I.slerp( interpolate_s * BLUR_SCALE, m_q_w_incre );
                 Eigen::Vector3d    interpolate_T = m_t_w_incre * ( interpolate_s * BLUR_SCALE );
-
                 point_w = m_q_w_last * ( interpolate_q * point_curr + interpolate_T ) + m_t_w_last;
             }
         }
@@ -530,7 +501,7 @@ class Laser_mapping
         t_wodom_curr.y() = laserOdometry->pose.pose.position.y;
         t_wodom_curr.z() = laserOdometry->pose.pose.position.z;
 
-        Eigen::Quaterniond q_w_curr = Eigen::Quaterniond(1,0,0,0);
+        Eigen::Quaterniond q_w_curr = Eigen::Quaterniond( 1, 0, 0, 0 );
         Eigen::Vector3d    t_w_curr = Eigen::Vector3d::Zero();
 
         nav_msgs::Odometry odomAftMapped;
@@ -587,8 +558,6 @@ class Laser_mapping
 
     void process()
     {
-        //pcl::VoxelGrid<PointType> downSizeFilterCorner;
-        //pcl::VoxelGrid<PointType> downSizeFilterSurf;
         double first_time_stamp = -1;
         m_last_max_blur = 0.0;
         while ( 1 )
@@ -633,7 +602,10 @@ class Laser_mapping
                 delete current_data_pair;
                 float min_t, max_t;
                 find_min_max_intensity( m_laser_cloud_full_res, min_t, max_t );
-
+                if ( m_if_save_to_pcd_files && PCD_SAVE_RAW )
+                {
+                    m_pcl_tools_raw.save_to_pcd_files( "raw", *m_laser_cloud_full_res, 1 );
+                }
                 m_q_w_last = m_q_w_curr;
                 m_t_w_last = m_t_w_curr;
                 m_minimum_pt_time_stamp = m_last_time_stamp;
@@ -641,14 +613,6 @@ class Laser_mapping
                 m_last_time_stamp = max_t;
                 reset_incremtal_parameter();
                 printf( "****** min max timestamp = [%.6f, %.6f] ****** \r\n", m_minimum_pt_time_stamp, m_maximum_pt_time_stamp );
-
-                // while ( !m_corner_last_que.empty() )
-                // {
-                //     m_corner_last_que.pop();
-                //     printf( "drop lidar frame in mapping for real time performance \n" );
-                // }
-
-                //transformAssociateToMap();
 
                 int centerCubeI = int( ( m_t_w_curr.x() + CUBE_W / 2 ) / CUBE_W ) + m_para_laser_cloud_center_width;
                 int centerCubeJ = int( ( m_t_w_curr.y() + CUBE_H / 2 ) / CUBE_H ) + m_para_laser_cloud_center_height;
@@ -916,7 +880,7 @@ class Laser_mapping
                 PointType              pointOri, pointSel;
                 int                    corner_rejection_num = 0;
                 int                    surface_rejecetion_num = 0;
-                int if_undistore_in_matching  = 1;
+                int                    if_undistore_in_matching = 1;
                 if ( laserCloudCornerFromMapNum > CORNER_MIN_MAP_NUM && laserCloudSurfFromMapNum > SURFACE_MIN_MAP_NUM && frameCount > m_mapping_init_accumulate_frames )
                 {
                     m_kdtree_corner_from_map->setInputCloud( m_laser_cloud_corner_from_map );
@@ -929,9 +893,9 @@ class Laser_mapping
                         corner_rejection_num = 0;
                         surface_rejecetion_num = 0;
 
-                        ceres::LossFunction *         loss_function = new ceres::HuberLoss( 0.1 );
-                        ceres::LocalParameterization *q_parameterization = new ceres::EigenQuaternionParameterization();
-                        ceres::Problem::Options       problem_options;
+                        ceres::LossFunction *               loss_function = new ceres::HuberLoss( 0.1 );
+                        ceres::LocalParameterization *      q_parameterization = new ceres::EigenQuaternionParameterization();
+                        ceres::Problem::Options             problem_options;
                         ceres::ResidualBlockId              block_id;
                         ceres::Problem                      problem( problem_options );
                         std::vector<ceres::ResidualBlockId> residual_block_ids;
@@ -942,11 +906,10 @@ class Laser_mapping
                         for ( int i = 0; i < laser_corner_pt_num; i++ )
                         {
                             pointOri = laserCloudCornerStack->points[ i ];
-                            pointAssociateToMap( &pointOri, &pointSel, refine_blur( pointOri.intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ), if_undistore_in_matching  );
+                            pointAssociateToMap( &pointOri, &pointSel, refine_blur( pointOri.intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ), if_undistore_in_matching );
 
                             m_kdtree_corner_from_map->nearestKSearch( pointSel, line_search_num, m_point_search_Idx, m_point_search_sq_dis );
 
-                            //if ( m_point_search_sq_dis[ 4 ] < 0.10 * std::max( std::max(pointOri.x, pointOri.y ),pointOri.z )  )
                             if ( m_point_search_sq_dis[ line_search_num - 1 ] < 2.0 )
                             {
                                 bool                         line_is_avail = true;
@@ -977,7 +940,6 @@ class Laser_mapping
 
                                     // if is indeed line feature
                                     // note Eigen library sort eigenvalues in increasing order
-                                    //Eigen::Vector3d unit_direction = saes.eigenvectors().col( 2 );
 
                                     if ( saes.eigenvalues()[ 2 ] > 3 * saes.eigenvalues()[ 1 ] )
                                     {
@@ -995,16 +957,13 @@ class Laser_mapping
                                 {
                                     if ( ICP_LINE )
                                     {
-                                        //ceres::CostFunction *cost_function = LidarEdgeFactor::Create( curr_point, point_a, point_b, 1.0 );
-                                        //ceres::CostFunction *cost_function = ceres_icp_point2line< double >::Create( curr_point, point_a, point_b );
                                         ceres::CostFunction *cost_function;
-                                        //if ( 1 )
                                         if ( MOTION_DEBLUR )
                                         {
                                             cost_function = ceres_icp_point2line<double>::Create( curr_point,
                                                                                                   pcl_pt_to_eigend( m_laser_cloud_corner_from_map->points[ m_point_search_Idx[ 0 ] ] ),
                                                                                                   pcl_pt_to_eigend( m_laser_cloud_corner_from_map->points[ m_point_search_Idx[ 1 ] ] ),
-                                                                                                  refine_blur( pointOri.intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ) * BLUR_SCALE,
+                                                                                                  refine_blur( pointOri.intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ) * 1.0,
                                                                                                   Eigen::Matrix<double, 4, 1>( m_q_w_last.w(), m_q_w_last.x(), m_q_w_last.y(), m_q_w_last.z() ),
                                                                                                   m_t_w_last ); //pointOri.intensity );
                                         }
@@ -1017,7 +976,7 @@ class Laser_mapping
                                                                                                   Eigen::Matrix<double, 4, 1>( m_q_w_last.w(), m_q_w_last.x(), m_q_w_last.y(), m_q_w_last.z() ),
                                                                                                   m_t_w_last );
                                         }
-                                        block_id = problem.AddResidualBlock( cost_function, loss_function, m_para_buffer_RT, m_para_buffer_RT + 4 );
+                                        block_id = problem.AddResidualBlock( cost_function, loss_function, m_para_buffer_incremental, m_para_buffer_incremental + 4 );
                                         residual_block_ids.push_back( block_id );
                                     }
                                     corner_avail_num++;
@@ -1027,19 +986,16 @@ class Laser_mapping
                                     corner_rejection_num++;
                                 }
                             }
-
                         }
 
                         for ( int i = 0; i < laser_surface_pt_num; i++ )
                         {
-                            //if ( laserCloudSurfStack->points[ i ].intensity < m_para_min_match_blur )
-                            //    continue;
+
                             pointOri = laserCloudSurfStack->points[ i ];
                             int planeValid = true;
-                            pointAssociateToMap( &pointOri, &pointSel, refine_blur( pointOri.intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ), if_undistore_in_matching   );
+                            pointAssociateToMap( &pointOri, &pointSel, refine_blur( pointOri.intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ), if_undistore_in_matching );
 
                             m_kdtree_surf_from_map->nearestKSearch( pointSel, plane_search_num, m_point_search_Idx, m_point_search_sq_dis );
-                            //if ( m_point_search_sq_dis[ plane_search_num - 1 ] < 0.10 * std::max( std::max(pointOri.x, pointOri.y ),pointOri.z ) )
                             if ( m_point_search_sq_dis[ plane_search_num - 1 ] < 10.0 )
                             {
                                 std::vector<Eigen::Vector3d> nearCorners;
@@ -1085,12 +1041,10 @@ class Laser_mapping
                                     if ( ICP_PLANE )
                                     {
                                         ceres::CostFunction *cost_function;
-                                        //if ( MOTION_DEBLUR && (iterCount == m_para_icp_max_iterations - 1) )
-                                        //if ( 1 )
+
                                         if ( MOTION_DEBLUR )
                                         {
-                                            //assert( pointOri.intensity <= 1.0 );
-                                            //assert( refine_blur( pointOri.intensity, m_min_blurs_s, m_max_blurs_s ) <= 1.0 );
+
                                             cost_function = ceres_icp_point2plane<double>::Create(
                                                 curr_point,
                                                 pcl_pt_to_eigend( m_laser_cloud_surf_from_map->points[ m_point_search_Idx[ 0 ] ] ),
@@ -1123,7 +1077,6 @@ class Laser_mapping
                             }
                         }
 
-
                         ceres::Solver::Options options;
 
                         std::vector<ceres::ResidualBlockId> residual_block_ids_bak;
@@ -1138,23 +1091,23 @@ class Laser_mapping
                             //options.gradient_check_relative_precision = 1e-10;
                             //options.function_tolerance = 1e-100; // default 1e-6
 
-                            //if(MOTION_DEBLUR ==0)
-                            //if(m_para_icp_max_iterations> 4)
                             if ( 0 )
                             {
                                 // NOTE Optimize T first and than R
                                 if ( iterCount < ( m_para_icp_max_iterations - 2 ) / 2 )
                                     problem.SetParameterBlockConstant( m_para_buffer_incremental + 4 );
-                                else if ( iterCount < m_para_icp_max_iterations -2 )
+                                else if ( iterCount < m_para_icp_max_iterations - 2 )
                                     problem.SetParameterBlockConstant( m_para_buffer_incremental );
                             }
-                            //set_ceres_solver_bound( problem );
+
+                            set_ceres_solver_bound( problem );
                             ceres::Solve( options, &problem, &summary );
 
                             // Remove outliers
                             residual_block_ids_bak.clear();
+
                             //if ( summary.final_cost > m_max_final_cost * 0.001 )
-                            if(1)
+                            if ( 1 )
                             {
                                 ceres::Problem::EvaluateOptions eval_options;
                                 eval_options.residual_blocks = residual_block_ids;
@@ -1164,14 +1117,11 @@ class Laser_mapping
                                 problem.Evaluate( eval_options, &total_cost, &residuals, nullptr, nullptr );
                                 avr_cost = total_cost / residual_block_ids.size();
 
-                                //*( g_file_logger.get_ostream() ) << "Pre: " << summary.BriefReport() << endl;
                                 for ( unsigned int i = 0; i < residual_block_ids.size(); i++ )
                                 {
-                                    // if ( ( fabs( residuals[ 3 * i + 0 ] ) + fabs( residuals[ 3 * i + 1 ] ) + fabs( residuals[ 3 * i + 2 ] ) ) > 20 * avr_cost )
                                     if ( ( fabs( residuals[ 3 * i + 0 ] ) + fabs( residuals[ 3 * i + 1 ] ) + fabs( residuals[ 3 * i + 2 ] ) ) > std::min( 0.1, 10 * avr_cost ) ) // std::min( 1.0, 10 * avr_cost )
                                     {
                                         problem.RemoveResidualBlock( residual_block_ids[ i ] );
-                                        //*( g_file_logger.get_ostream() ) << "X" ;
                                     }
                                     else
                                     {
@@ -1179,16 +1129,16 @@ class Laser_mapping
                                     }
                                 }
                             }
-                            //*( m_file_logger.get_ostream() ) << "Inline blk size = " << residual_block_ids_bak.size() << endl;
+
                             residual_block_ids = residual_block_ids_bak;
                         }
                         options.max_num_iterations = m_para_cere_max_iterations;
                         set_ceres_solver_bound( problem );
                         ceres::Solve( options, &problem, &summary );
-                        if(MOTION_DEBLUR)
+                        if ( MOTION_DEBLUR )
                         {
-                          compute_interpolatation_rodrigue( m_q_w_incre, m_interpolatation_omega, m_interpolatation_theta, m_interpolatation_omega_hat );
-                          m_interpolatation_omega_hat_sq2 = m_interpolatation_omega_hat * m_interpolatation_omega_hat;
+                            compute_interpolatation_rodrigue( m_q_w_incre, m_interpolatation_omega, m_interpolatation_theta, m_interpolatation_omega_hat );
+                            m_interpolatation_omega_hat_sq2 = m_interpolatation_omega_hat * m_interpolatation_omega_hat;
                         }
                         m_t_w_curr = m_q_w_last * m_t_w_incre + m_t_w_last;
                         m_q_w_curr = m_q_w_last * m_q_w_incre;
@@ -1215,7 +1165,6 @@ class Laser_mapping
                     *( m_file_logger.get_ostream() ) << "Curr R:" << m_q_w_curr.toRotationMatrix().eulerAngles( 0, 1, 2 ).transpose() * 57.3 << " ,T = " << m_t_w_curr.transpose() << endl;
                     //*(g_file_logger.get_ostream()) << summary.FullReport() << endl;
                     *( m_file_logger.get_ostream() ) << "Full pointcloud size: " << m_laser_cloud_full_res->points.size() << endl;
-
 
                     m_file_logger.printf( "Motion blur = %d | ", MOTION_DEBLUR );
                     m_file_logger.printf( "Cost = %.2f| blk_size = %d | corner_num = %d | surf_num = %d | angle dis = %.2f | T dis = %.2f \r\n",
@@ -1287,8 +1236,6 @@ class Laser_mapping
 
                 for ( int i = 0; i < laser_surface_pt_num; i++ )
                 {
-                    //if ( MOTION_DEBLUR && ( laserCloudSurfStack->points[ i ].intensity < m_para_min_match_blur ) )
-
                     //*( m_file_logger.get_ostream() ) << __FILE__ << " --- " << __LINE__ << endl;
                     pointAssociateToMap( &laserCloudSurfStack->points[ i ], &pointSel, refine_blur( laserCloudSurfStack->points[ i ].intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ), g_if_undistore );
 
@@ -1338,7 +1285,7 @@ class Laser_mapping
                 //publish surround map for every 5 frame
                 if ( PUB_SURROUND_PTS )
                 {
-                    if ( frameCount % 5 == 0 )
+                    if ( frameCount % 500 == 0 )
                     {
                         m_laser_cloud_surround->clear();
 
@@ -1357,7 +1304,7 @@ class Laser_mapping
 
                         if ( m_if_save_to_pcd_files )
                         {
-                            m_pcl_tools.save_to_pcd_files( "surround", *m_laser_cloud_surround );
+                            m_pcl_tools_aftmap.save_to_pcd_files( "surround", *m_laser_cloud_surround );
                         }
                     }
 
@@ -1383,7 +1330,6 @@ class Laser_mapping
 
                 for ( int i = 0; i < laserCloudFullResNum; i++ )
                 {
-                    //pointAssociateToMap( &m_laser_cloud_full_res->points[ i ], &m_laser_cloud_full_res->points[ i ],refine_blur( m_laser_cloud_full_res->points[ i ].intensity, m_min_blurs_s, m_max_blurs_s) , g_if_undistore  );
                     pointAssociateToMap( &m_laser_cloud_full_res->points[ i ], &m_laser_cloud_full_res->points[ i ], refine_blur( m_laser_cloud_full_res->points[ i ].intensity, m_minimum_pt_time_stamp, m_maximum_pt_time_stamp ), 1 );
                 }
                 sensor_msgs::PointCloud2 laserCloudFullRes3;
@@ -1394,7 +1340,7 @@ class Laser_mapping
 
                 if ( m_if_save_to_pcd_files )
                 {
-                    m_pcl_tools.save_to_pcd_files( "scan", *m_laser_cloud_full_res, 1 );
+                    m_pcl_tools_aftmap.save_to_pcd_files( "aft_mapp", *m_laser_cloud_full_res, 1 );
                 }
 
                 nav_msgs::Odometry odomAftMapped;

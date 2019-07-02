@@ -222,8 +222,6 @@ class Laser_feature
                 return;
         }
 
-        //    std::vector< int > scanStartInd( N_SCANS*10, 0 );
-        //    std::vector< int > scanEndInd( N_SCANS*10, 0 );
         std::vector<int> scanStartInd( 1000, 0 );
         std::vector<int> scanEndInd( 1000, 0 );
 
@@ -237,9 +235,8 @@ class Laser_feature
 
         if ( m_lidar_type ) // Livox scans
         {
-            //printf_line;
+
             laserCloudScans = m_livox.extract_laser_features( laserCloudIn, laserCloudMsg->header.stamp.toSec() );
-            //printf_line;
 
             if ( laserCloudScans.size() <= 5 ) // less than 5 scan
             {
@@ -248,8 +245,6 @@ class Laser_feature
 
             m_laser_scan_number = laserCloudScans.size() * 1.0;
 
-            //        N_SCANS = laserCloudScans.size()/4;
-            //N_SCANS = 16;
             scanStartInd.resize( m_laser_scan_number );
             scanEndInd.resize( m_laser_scan_number );
             std::fill( scanStartInd.begin(), scanStartInd.end(), 0 );
@@ -261,34 +256,19 @@ class Laser_feature
                 *    Feature extraction for livox lidar     *
                 ********************************************/
                 int piece_wise = 3;
-                /*if ( m_if_motion_deblur )
-                {
-                    piece_wise = 1;
-                }*/
+
                 vector<float> piece_wise_start( piece_wise );
                 vector<float> piece_wise_end( piece_wise );
 
                 for ( int i = 0; i < piece_wise; i++ )
                 {
                     int start_scans, end_scans;
-                    /*if ( i != 0 )
-                    {
-                        start_scans = int( ( m_laser_scan_number * (i)  ) / piece_wise ) -1 ;
-                        end_scans = int( ( m_laser_scan_number * ( i + 1 ) ) / piece_wise ) - 1;
-                    }
-                    else
-                    {
-                        start_scans = 0;
-                        end_scans = int( ( m_laser_scan_number * ( 1 ) ) / piece_wise ) ;
-                    }*/
-                    start_scans = int( ( m_laser_scan_number * (i)  ) / piece_wise )  ;
+
+                    start_scans = int( ( m_laser_scan_number * ( i ) ) / piece_wise );
                     end_scans = int( ( m_laser_scan_number * ( i + 1 ) ) / piece_wise ) - 1;
 
                     int end_idx = laserCloudScans[ end_scans ].size() - 1;
                     piece_wise_start[ i ] = ( ( float ) m_livox.find_pt_info( laserCloudScans[ start_scans ].points[ 0 ] )->idx ) / m_livox.m_pts_info_vec.size();
-                    // printf( "Max scan number = %d, start = %d, end  = %d, %d \r\n", m_laser_scan_number, start_scans, end_scans, end_idx );
-                    // cout << "Start pt: " << laserCloudScans[ start_scans ].points[ 0 ] << endl;
-                    // cout << "End pt: " << laserCloudScans[ end_scans ].points[ end_idx ] << endl;
                     piece_wise_end[ i ] = ( ( float ) m_livox.find_pt_info( laserCloudScans[ end_scans ].points[ end_idx ] )->idx ) / m_livox.m_pts_info_vec.size();
                 }
 
@@ -297,15 +277,7 @@ class Laser_feature
                     pcl::PointCloud<PointType>::Ptr livox_corners( new pcl::PointCloud<PointType>() ),
                         livox_surface( new pcl::PointCloud<PointType>() ),
                         livox_full( new pcl::PointCloud<PointType>() );
-                    /*if (   )
-                    {
-                        m_livox.get_features( *livox_corners, *livox_surface, *livox_full, 0.0, 1.0 );
-                    }
-                    else
-                    {
-                        //m_livox.get_features( *livox_corners, *livox_surface, *livox_full, float( i ) / float( piece_wise ), float( i + 1 ) / float( piece_wise ) );
-                      m_livox.get_features( *livox_corners, *livox_surface, *livox_full, piece_wise_start[ i ], piece_wise_end[ i ] );
-                    }*/
+
                     m_livox.get_features( *livox_corners, *livox_surface, *livox_full, piece_wise_start[ i ], piece_wise_end[ i ] );
 
                     ros::Time current_time = ros::Time::now();
@@ -328,9 +300,9 @@ class Laser_feature
                     temp_out_msg.header.stamp = current_time;
                     temp_out_msg.header.frame_id = "/camera_init";
                     m_pub_pc_livox_corners.publish( temp_out_msg );
-                    if(m_odom_mode == 0) // odometry mode
+                    if ( m_odom_mode == 0 ) // odometry mode
                     {
-                      break;
+                        break;
                     }
                 }
             }
