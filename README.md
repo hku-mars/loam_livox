@@ -20,7 +20,7 @@ In the development of our package, we reference to LOAM, [LOAM_NOTED](https://gi
 
 **Related paper**: our related paper are now available on arxiv:
 1. [Loam_livox: A fast, robust, high-precision LiDAR odometry and mapping package for LiDARs of small FoV](https://arxiv.org/abs/1909.06700)
-2. [A fast, complete, point cloud based loop closure for LiDAR odometry and mapping](https://arxiv.org/abs/1909.06700)
+2. [A fast, complete, point cloud based loop closure for LiDAR odometry and mapping](https://arxiv.org/abs/1909.11811)
 
 
 ## 1. Prerequisites
