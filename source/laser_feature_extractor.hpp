@@ -1,7 +1,7 @@
 // This is the Lidar Odometry And Mapping (LOAM) for solid-state lidar (for example: livox lidar),
 // which suffer form motion blur due the continously scan pattern and low range of fov.
 
-// Developer: Lin Jiarong  ziv.lin.ljr@gmail.com
+// Developer: Jiarong Lin  ziv.lin.ljr@gmail.com
 
 //   J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time.
 //     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014.
@@ -55,7 +55,7 @@
 
 #include "livox_feature_extractor.hpp"
 #include "tools/common.h"
-#include "tools/logger.hpp"
+#include "tools/tools_logger.hpp"
 
 using std::atan2;
 using std::cos;
@@ -69,7 +69,7 @@ class Laser_feature
 
     int m_if_pub_debug_feature = 1;
 
-    const int   m_para_system_delay = 2;
+    const int   m_para_system_delay = 20;
     int         m_para_system_init_count = 0;
     bool        m_para_systemInited = false;
     float       m_pc_curvature[ 400000 ];
@@ -87,6 +87,8 @@ class Laser_feature
     int         m_laser_scan_number = 64;
     Livox_laser m_livox;
     ros::Time   m_init_timestamp;
+    ADD_SCREEN_PRINTF_OUT_METHOD;
+
     bool comp( int i, int j )
     {
         return ( m_pc_curvature[ i ] < m_pc_curvature[ j ] );
@@ -102,44 +104,57 @@ class Laser_feature
 
     ros::Subscriber m_sub_input_laser_cloud;
 
-    double MINIMUM_RANGE = 0.01;
+    double m_minimum_range = 0.01;
 
     ros::Publisher            m_pub_pc_livox_corners, m_pub_pc_livox_surface, m_pub_pc_livox_full;
     sensor_msgs::PointCloud2  temp_out_msg;
     pcl::VoxelGrid<PointType> m_voxel_filter_for_surface;
     pcl::VoxelGrid<PointType> m_voxel_filter_for_corner;
+
+    template<typename T>
+    T get_ros_parameter(ros::NodeHandle &nh , const std::string parameter_name, T & parameter, const T default_val)
+    {
+        nh.param<T>(parameter_name.c_str(), parameter, default_val);
+        ENABLE_SCREEN_PRINTF;
+        screen_out <<"[Features_extraction_ros_param]: " << parameter_name << " ==> " << parameter << std::endl;
+        return parameter;
+    }
+
+
     int                       init_ros_env()
     {
+
         ros::NodeHandle nh;
         m_init_timestamp = ros::Time::now();
-        init_livox_lidar_para();
-
-        nh.param<int>( "scan_line", m_laser_scan_number, 16 );
-        nh.param<float>( "mapping_plane_resolution", m_plane_resolution, 0.8 );
-        nh.param<float>( "mapping_line_resolution", m_line_resolution, 0.8 );
-        nh.param<double>( "minimum_range", MINIMUM_RANGE, 0.1 );
-        nh.param<int>( "if_motion_deblur", m_if_motion_deblur, 1 );
-        nh.param<int>( "odom_mode", m_odom_mode, 0 );
+        init_livox_lidar_para(nh);
+        get_ros_parameter<int>(nh, "feature_extraction/scan_line", m_laser_scan_number, 16 );
+        get_ros_parameter<float>( nh,"feature_extraction/mapping_plane_resolution", m_plane_resolution, 0.8 );
+        get_ros_parameter<float>( nh,"feature_extraction/mapping_line_resolution", m_line_resolution, 0.8 );
+        get_ros_parameter<double>(nh, "feature_extraction/minimum_range", m_minimum_range, 0.1 );
+        get_ros_parameter<int>( nh,"common/if_motion_deblur", m_if_motion_deblur, 1 );
+        get_ros_parameter<int>(nh, "common/odom_mode", m_odom_mode, 0 );
 
         double livox_corners, livox_surface, minimum_view_angle;
-        nh.param<double>( "corner_curvature", livox_corners, 0.05 );
-        nh.param<double>( "surface_curvature", livox_surface, 0.01 );
-        nh.param<double>( "minimum_view_angle", minimum_view_angle, 10 );
+        get_ros_parameter<double>(nh, "feature_extraction/corner_curvature", livox_corners, 0.05 );
+        get_ros_parameter<double>(nh, "feature_extraction/surface_curvature", livox_surface, 0.01 );
+        get_ros_parameter<double>(nh, "feature_extraction/minimum_view_angle", minimum_view_angle, 10 );
+        string log_save_dir_name;
+        get_ros_parameter<std::string>( nh,"log_save_dir", log_save_dir_name, "../" );
+
         m_livox.thr_corner_curvature = livox_corners;
         m_livox.thr_surface_curvature = livox_surface;
         m_livox.minimum_view_angle = minimum_view_angle;
         //livox.m_livox_min_allow_dis = MINIMUM_RANGE;
 
-        printf( "scan line number %d \n", m_laser_scan_number );
+        screen_printf( "scan line number %d \n", m_laser_scan_number );
 
         if ( m_laser_scan_number != 16 && m_laser_scan_number != 64 )
         {
-            printf( "only support velodyne with 16 or 64 scan line!" );
+            screen_printf( "only support velodyne with 16 or 64 scan line!" );
             return 0;
         }
 
-        string log_save_dir_name;
-        nh.param<std::string>( "log_save_dir", log_save_dir_name, "../" );
+
         m_file_logger.set_log_dir( log_save_dir_name );
         m_file_logger.init( "scanRegistration.log" );
 
@@ -255,8 +270,12 @@ class Laser_feature
                 /********************************************
                 *    Feature extraction for livox lidar     *
                 ********************************************/
-                int piece_wise = 3;
 
+                int piece_wise = 3;
+                if(m_if_motion_deblur)
+                {
+                    piece_wise = 3;
+                }
                 vector<float> piece_wise_start( piece_wise );
                 vector<float> piece_wise_end( piece_wise );
 
@@ -315,7 +334,7 @@ class Laser_feature
             ********************************************/
             std::vector<int> indices;
             pcl::removeNaNFromPointCloud( laserCloudIn, laserCloudIn, indices );
-            removeClosedPointCloud( laserCloudIn, laserCloudIn, MINIMUM_RANGE );
+            removeClosedPointCloud( laserCloudIn, laserCloudIn, m_minimum_range );
 
             //printf_line;
             float startOri = -atan2( laserCloudIn.points[ 0 ].y, laserCloudIn.points[ 0 ].x );
@@ -529,7 +548,7 @@ class Laser_feature
 
                 if ( pt_info->pt_type != Livox_laser::e_pt_normal )
                 {
-                    //std::cout << "Reject, id = "<<idx << " ---, type = " << livox.m_mask_pointtype[idx] <<std::endl;
+                    //screen_out << "Reject, id = "<<idx << " ---, type = " << livox.m_mask_pointtype[idx] <<std::endl;
                     m_pc_neighbor_picked[ idx ] = 1;
                 }
             }
@@ -742,42 +761,43 @@ class Laser_feature
         }
     }
 
-    void init_livox_lidar_para()
+    void init_livox_lidar_para( ros::NodeHandle & nh )
     {
-        std::string lidar_tpye_name;
-        std::cout << "~~~~~ Init livox lidar parameters ~~~~~" << endl;
-        if ( ros::param::get( "lidar_type", lidar_tpye_name ) )
+        ENABLE_SCREEN_PRINTF;
+        string lidar_tpye_name;
+        screen_out << "~~~~~ Init livox lidar parameters ~~~~~" << std::endl;
+        if(get_ros_parameter<std::string>( nh, "common/lidar_type", lidar_tpye_name , std::string( "" ) ).length() )
         {
-            printf( "***** I get lidar_type declaration, lidar_type_name = %s ***** \r\n", lidar_tpye_name.c_str() );
+            screen_printf( "***** I get lidar_type declaration, lidar_type_name = %s ***** \r\n", lidar_tpye_name.c_str() );
 
             if ( lidar_tpye_name.compare( "livox" ) == 0 )
             {
                 m_lidar_type = 1;
-                std::cout << "Set lidar type = livox" << std::endl;
+                screen_out << "Set lidar type = livox" << std::endl;
             }
             else
             {
-                std::cout << "Set lidar type = velodyne" << std::endl;
+                screen_out << "Set lidar type = velodyne" << std::endl;
                 m_lidar_type = 0;
             }
         }
         else
         {
-            printf( "***** No lidar_type declaration ***** \r\n" );
+            screen_printf( "***** No lidar_type declaration ***** \r\n" );
             m_lidar_type = 0;
-            std::cout << "Set lidar type = velodyne" << std::endl;
+            screen_out << "Set lidar type = velodyne" << std::endl;
         }
 
-        if ( ros::param::get( "livox_min_dis", m_livox.m_livox_min_allow_dis ) )
+        if ( get_ros_parameter<float>( nh, "feature_extraction/livox_min_dis", m_livox.m_livox_min_allow_dis , 0.1 ) )
         {
-            std::cout << "Set livox lidar minimum distance= " << m_livox.m_livox_min_allow_dis << std::endl;
+            screen_out << "Set livox lidar minimum distance= " << m_livox.m_livox_min_allow_dis << std::endl;
         }
 
-        if ( ros::param::get( "livox_min_sigma", m_livox.m_livox_min_sigma ) )
+        if ( get_ros_parameter<float>( nh, "feature_extraction/livox_min_sigma", m_livox.m_livox_min_sigma, 7e-4 ) )
         {
-            std::cout << "Set livox lidar minimum sigama =  " << m_livox.m_livox_min_sigma << std::endl;
+            screen_out << "Set livox lidar minimum sigama =  " << m_livox.m_livox_min_sigma << std::endl;
         }
-        std::cout << "~~~~~ End ~~~~~" << endl;
+        screen_out << "~~~~~ End ~~~~~" << endl;
     }
 };
 

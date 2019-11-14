@@ -1,7 +1,7 @@
 // This is the Lidar Odometry And Mapping (LOAM) for solid-state lidar (for example: livox lidar),
 // which suffer form motion blur due the continously scan pattern and low range of fov.
 
-// Developer: Lin Jiarong  ziv.lin.ljr@gmail.com
+// Developer: Jiarong Lin  ziv.lin.ljr@gmail.com
 
 //   J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time.
 //     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014.
@@ -61,10 +61,10 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_datatypes.h>
 
-#include "eigen_math.hpp"
 #include "tools/common.h"
 #include "tools/pcl_tools.hpp"
-
+#include "tools/tools_eigen_math.hpp"
+#include "tools/tools_logger.hpp"
 #define PCL_DATA_SAVE_DIR "/home/ziv/data/loam_pc"
 
 #define IF_LIVOX_HANDLER_REMOVE 0
@@ -170,16 +170,17 @@ class Livox_laser
 
     int     m_img_width = 800;
     int     m_img_heigh = 800;
-
+    ADD_SCREEN_PRINTF_OUT_METHOD;
     ~Livox_laser() {}
 
     Livox_laser()
     {
         // Some data init
-        cout << "========= Hello, this is livox laser ========" << endl;
-        cout << "Compile time:  " << __TIME__ << endl;
-        cout << "Softward version: " << SOFT_WARE_VERSION << endl;
-        cout << "========= End ========" << endl;
+        ENABLE_SCREEN_PRINTF;
+        screen_out << "========= Hello, this is livox laser ========" << endl;
+        screen_out << "Compile time:  " << __TIME__ << endl;
+        screen_out << "Softward version: " << SOFT_WARE_VERSION << endl;
+        screen_out << "========= End ========" << endl;
 
         m_max_edge_polar_pos = std::pow( tan( max_fov / 57.3 ) * 1, 2 );
     }
@@ -331,7 +332,7 @@ class Livox_laser
 
                 if ( i != 0 && ( idx >= 0 ) && ( idx < ( int ) m_pts_info_vec.size() ) )
                 {
-                    //cout << "Add mask, id  = " << idx << "  type = " << pt_type << endl;
+                    //screen_out << "Add mask, id  = " << idx << "  type = " << pt_type << endl;
                     m_pts_info_vec[ idx ].pt_type |= pt_type;
                 }
             }
@@ -342,7 +343,7 @@ class Livox_laser
     {
         if ( pt_info->depth_sq2 < m_livox_min_allow_dis * m_livox_min_allow_dis ) // to close
         {
-            //cout << "Add mask, id  = " << idx << "  type = e_too_near" << endl;
+            //screen_out << "Add mask, id  = " << idx << "  type = e_too_near" << endl;
             add_mask_of_point( pt_info, e_pt_too_near );
         }
 
@@ -350,7 +351,7 @@ class Livox_laser
 
         if ( pt_info->sigma < m_livox_min_sigma )
         {
-            //cout << "Add mask, id  = " << idx << "  type = e_reflectivity_low" << endl;
+            //screen_out << "Add mask, id  = " << idx << "  type = e_reflectivity_low" << endl;
             add_mask_of_point( pt_info, e_pt_reflectivity_low );
         }
     }
@@ -363,7 +364,6 @@ class Livox_laser
         int          critical_rm_point = e_pt_000 | e_pt_nan;
         float        neighbor_accumulate_xyz[ 3 ] = { 0.0, 0.0, 0.0 };
 
-        //cout << "Surface_thr = " << thr_surface_curvature << " , corner_thr = " << thr_corner_curvature<< " ,minimum_view_angle = " << minimum_view_angle << endl;
         for ( size_t idx = curvature_ssd_size; idx < pts_size - curvature_ssd_size; idx++ )
         {
             if ( m_pts_info_vec[ idx ].pt_type & critical_rm_point )
@@ -440,8 +440,6 @@ class Livox_laser
                 float sq2_diff = 0.1;
 
                 if ( m_pts_info_vec[ idx ].curvature > thr_corner_curvature )
-                // if ( abs( m_pts_info_vec[ idx ].view_angle - m_pts_info_vec[ idx + curvature_ssd_size ].view_angle ) > edge_angle_diff ||
-                //      abs( m_pts_info_vec[ idx ].view_angle - m_pts_info_vec[ idx - curvature_ssd_size ].view_angle ) > edge_angle_diff )
                 {
                     if ( m_pts_info_vec[ idx ].depth_sq2 <= m_pts_info_vec[ idx - curvature_ssd_size ].depth_sq2 &&
                          m_pts_info_vec[ idx ].depth_sq2 <= m_pts_info_vec[ idx + curvature_ssd_size ].depth_sq2 )
@@ -496,14 +494,13 @@ class Livox_laser
                 if ( idx == 0 )
                 {
                     // TODO: handle this case.
-                    std::cout << "First point should be normal!!!" << std::endl;
-                    return 0;
+                    screen_out << "First point should be normal!!!" << std::endl;
+                    //return 0;
                 }
                 else
                 {
                     pt_info->pt_2d_img = m_pts_info_vec[ idx - 1 ].pt_2d_img;
                     pt_info->polar_dis_sq2 = m_pts_info_vec[ idx - 1 ].polar_dis_sq2;
-                    //cout << "Add mask, id  = " << idx << "  type = e_point_000" << endl;
                     add_mask_of_point( pt_info, e_pt_000 );
                     continue;
                 }
@@ -513,7 +510,6 @@ class Livox_laser
 
             pt_info->depth_sq2 = depth2_xyz( laserCloudIn.points[ idx ].x, laserCloudIn.points[ idx ].y, laserCloudIn.points[ idx ].z );
 
-            //cout << "eval_point: d = " << pts_depth[ idx ] << " , " << laserCloudIn.points[ idx ].x << " , " << laserCloudIn.points[ idx ].y << " , " << laserCloudIn.points[ idx ].z << endl;
             pt_info->pt_2d_img << laserCloudIn.points[ idx ].y / laserCloudIn.points[ idx ].x, laserCloudIn.points[ idx ].z / laserCloudIn.points[ idx ].x;
             pt_info->polar_dis_sq2 = dis2_xy( pt_info->pt_2d_img( 0 ), pt_info->pt_2d_img( 1 ) );
 
@@ -585,23 +581,17 @@ class Livox_laser
                     pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.20 );
                     scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
                     scan_angle = scan_angle + 180.0;
-                    //pt_angle_index = split_idx[ val_index + 1 ] - 10;
                 }
                 else
                 {
                     pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.80 );
                     scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
                     scan_angle = scan_angle + 180.0;
-                    //pt_angle_index = split_idx[ val_index ] + 10;
                 }
-
-                //cout << "Idx  = " << idx <<  " val = "<< val_index << "  angle = " << scan_angle << endl;
             }
             m_pts_info_vec[ idx ].polar_angle = scan_angle;
             scan_id_index[ idx ] = scan_angle;
         }
-
-        //cout << "===== " << zero_idx.size() << "  " << edge_idx.size() << "  " << split_idx.size() << "=====" << endl;
 
         return split_idx.size() - 1;
     }
@@ -611,22 +601,16 @@ class Livox_laser
     void reorder_laser_cloud_scan( std::vector< pcl::PointCloud< pcl::PointXYZI > > &in_laserCloudScans, std::vector< std::vector< int > > &pts_mask )
     {
         unsigned int min_pts_per_scan = 0;
-        cout << "Before reorder" << endl;
-        //cout << "Cloud size: " << in_laserCloudScans.size() << endl;
-        //std::vector< pcl::PointCloud< PointType > > res_laser_cloud( in_laserCloudScans.size() - 2 ); // abandon first and last
-        //std::vector<std::vector<int>> res_pts_mask( in_laserCloudScans.size() - 2 );
+        screen_out << "Before reorder" << endl;
+        
         std::vector< pcl::PointCloud< pcl::PointXYZI > > res_laser_cloud( in_laserCloudScans.size() ); // abandon first and last
         std::vector< std::vector< int > >                res_pts_mask( in_laserCloudScans.size() );
         std::map< float, int > map_angle_idx;
 
-        // for (unsigned int i = 1; i < in_laserCloudScans.size() - 1; i++ )
         for ( unsigned int i = 0; i < in_laserCloudScans.size() - 0; i++ )
         {
             if ( in_laserCloudScans[ i ].size() > min_pts_per_scan )
             {
-                //cout << i << endl;
-                //cout << "[" << i << "] size = ";
-                //cout << in_laserCloudScans[ i ].size() << "  ,id = " << ( int ) in_laserCloudScans[ i ].points[ 0 ].intensity << endl;
                 map_angle_idx.insert( std::make_pair( in_laserCloudScans[ i ].points[ 0 ].intensity, i ) );
             }
             else
@@ -635,13 +619,12 @@ class Livox_laser
             }
         }
 
-        cout << "After reorder" << endl;
+        screen_out << "After reorder" << endl;
         std::map< float, int >::iterator it;
         int current_index = 0;
 
         for ( it = map_angle_idx.begin(); it != map_angle_idx.end(); it++ )
         {
-            //cout << "[" << current_index << "] id = " << it->first << endl;
             if ( in_laserCloudScans[ it->second ].size() > min_pts_per_scan )
             {
                 res_laser_cloud[ current_index ] = in_laserCloudScans[ it->second ];
@@ -652,11 +635,10 @@ class Livox_laser
 
         res_laser_cloud.resize( current_index );
         res_pts_mask.resize( current_index );
-        //cout << "Final size = " << current_index <<endl;
-        //printf_line;
+
         in_laserCloudScans = res_laser_cloud;
         pts_mask = res_pts_mask;
-        cout << "Return size = " << pts_mask.size() << "  " << in_laserCloudScans.size() << endl;
+        screen_out << "Return size = " << pts_mask.size() << "  " << in_laserCloudScans.size() << endl;
         return;
     }
 
@@ -676,12 +658,9 @@ class Livox_laser
         {
 
             point = laserCloudIn.points[ i ];
-
-            //point.intensity = ( float ) ( scan_id_index[ i ] );
-
+            
             if ( i > 0 && ( ( scan_id_index[ i ] ) != ( scan_id_index[ i - 1 ] ) ) )
             {
-                //std::cout << "Scan idx = " << scan_idx << " intensity = " << scan_id_index[ i ] << std::endl;
                 scan_idx = scan_idx + 1;
                 pts_mask[ scan_idx ].reserve( 5000 );
             }
@@ -700,9 +679,9 @@ class Livox_laser
 
         for ( unsigned int i = 0; i < laserCloudScans.size(); i++ )
         {
-            //std::cout << "Scan idx = " << i;
-            //cout << "  ,length = " << laserCloudScans[ i ].size();
-            //cout << "  ,intensity = " << laserCloudScans[ i ].points[ 0 ].intensity << std::endl;
+            //screen_out << "Scan idx = " << i;
+            //screen_out << "  ,length = " << laserCloudScans[ i ].size();
+            //screen_out << "  ,intensity = " << laserCloudScans[ i ].points[ 0 ].intensity << std::endl;
             int scan_avail_num = 0;
             for ( unsigned int idx = 0; idx < laserCloudScans[ i ].size(); idx++ )
             {
@@ -711,7 +690,7 @@ class Livox_laser
                 {
                     if ( laserCloudScans[ i ].points[ idx ].x == 0 )
                     {
-                        printf( "Error!!! Mask = %d\r\n", pts_mask[ i ][ idx ] );
+                        screen_printf( "Error!!! Mask = %d\r\n", pts_mask[ i ][ idx ] );
                         assert( laserCloudScans[ i ].points[ idx ].x != 0 );
                         continue;
                     }
@@ -723,26 +702,26 @@ class Livox_laser
             }
             laserCloudScans[ i ].resize( scan_avail_num );
         }
-        //printf_line;
     }
 
     template < typename T >
     std::vector< pcl::PointCloud< pcl::PointXYZI > > extract_laser_features( pcl::PointCloud< T > &laserCloudIn, double time_stamp = -1 )
     {
-        //printf_line;
         assert(time_stamp >= 0.0);
-        if(time_stamp == 0 ) // old firmware, without timestamp
+        if(time_stamp <= 0.0000001 || (time_stamp < m_last_maximum_time_stamp) ) // old firmware, without timestamp
         {
             m_current_time = m_last_maximum_time_stamp;
+        }
+        else
+        {
+          m_current_time = time_stamp - m_first_receive_time;
         }
         if ( m_first_receive_time <= 0 )
         {
             m_first_receive_time = time_stamp;
         }
 
-        m_current_time = time_stamp - m_first_receive_time;
-        //printf("First extract feature, time = %.5f \r\n", m_first_receive_time);
-        //printf("Extract features, current time = %.5f \r\n", m_current_time);
+        screen_out << "Extract feature, input: " << time_stamp << ", first time: " << m_first_receive_time << ", current_time: " << m_current_time << endl;
         std::vector< pcl::PointCloud< PointType > > laserCloudScans, temp_laser_scans;
         std::vector< float >                        scan_id_index;
         laserCloudScans.clear();
@@ -753,7 +732,7 @@ class Livox_laser
             stringstream ss;
             ss << PCL_DATA_SAVE_DIR << "/pc_" << pcl_data_save_index << ".pcd" << endl;
             pcl_data_save_index = pcl_data_save_index + 1;
-            std::cout << "Save file = " << ss.str() << endl;
+            screen_out << "Save file = " << ss.str() << endl;
             pcl::io::savePCDFileASCII( ss.str(), laserCloudIn );
         }
 

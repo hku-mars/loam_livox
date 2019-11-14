@@ -1,0 +1,56 @@
+common:
+    lidar_type: "livox"
+    maximum_parallel_thread: 1      # number of thread use for interative pose optimization
+    odom_mode: 1
+    if_motion_deblur: 0             # motion deblur, 0: piesewise processing; 1: linear interpolation
+    if_save_to_pcd_files: 0
+    if_update_mean_and_cov_incrementally: 1
+    threshold_cell_revisit: 2000    # if update frame index bigger than this threshold, treat target cell as revisited
+
+feature_extraction:
+    scan_line: 64
+    mapping_line_resolution: 0.1
+    mapping_plane_resolution: 0.4
+    livox_min_sigma: 7e-4
+    livox_min_dis: 0.1
+    corner_curvature: 0.1
+    surface_curvature: 0.005
+    minimum_view_angle: 5
+
+optimization:
+    minimum_icp_R_diff: 0.01
+    minimum_icp_T_diff: 0.01
+    maximum_residual_blocks: 200
+    max_allow_final_cost: 2.0
+    icp_maximum_iteration: 15
+    ceres_maximum_iteration: 50
+
+mapping:
+    matching_mode: 0            # 0 = history, 1 = cube
+    input_downsample_mode: 1    #
+    init_accumulate_frames: 50
+    maximum_mapping_buffer: 20000000
+    maximum_histroy_buffer: 400
+    maximum_in_fov_angle: 45
+    maximum_pointcloud_delay_time: 0.1
+    maximum_search_range_corner: 100
+    maximum_search_range_surface: 100
+    surround_pointcloud_resolution: 0.30
+    max_allow_incre_R: 20
+    max_allow_incre_T: 0.3
+    max_allow_final_cost: 2.0
+
+loop_closure:
+    if_enable_loop_closure: 0
+    if_dump_keyframe_data: 0
+    scans_of_each_keyframe: 300
+    scans_between_two_keyframe: 100
+    minimum_keyframe_differen: 200
+    minimum_similarity_linear: 0.65
+    minimum_similarity_planar: 0.94
+    map_alignment_resolution: 0.1
+    maximum_keyframe_in_waiting_list: 10
+    map_alignment_maximum_icp_iteration: 5
+    map_alignment_inlier_threshold: 0.20
+    map_alignment_if_dump_matching_result: 0
+    scene_alignment_maximum_residual_block: 3000
