@@ -48,6 +48,7 @@ Follow [Ceres Installation](http://ceres-solver.org/installation.html).
 ### 1.3. **PCL**
 Follow [PCL Installation](http://www.pointclouds.org/downloads/linux.html).
 
+**NOTICE:** Recently, we find that the point cloud output form the voxelgrid filter vary form PCL 1.7 and 1.9, and PCL 1.7 leads some failure in some of our examples ([issue #28](https://github.com/hku-mars/loam_livox/issues/28)). By this, we strongly recommand you to use update your PCL as version 1.9 if you are using the lower version.
 
 ## 2. Build
 Clone the repository and catkin_make:
