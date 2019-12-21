@@ -7,7 +7,7 @@
     <param name="common/if_verbose_screen_printf" type="int" value="1"/>
     
     <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration">
-     <remap from="/laser_points" to="/livox/lidar" />
+     <remap from="/laser_points_0" to="/livox/lidar" />
     </node>
 
     <node pkg="loam_livox" type="livox_laserMapping" name="livox_laserMapping" output="screen" />

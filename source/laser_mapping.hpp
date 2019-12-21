@@ -304,6 +304,7 @@ class Laser_mapping
     std::list<std::shared_ptr<Maps_keyframe<float>>> m_keyframe_of_updating_list;
     std::list<std::shared_ptr<Maps_keyframe<float>>> m_keyframe_need_precession_list;
 
+    Scene_alignment<float>                           m_scene_align;
     ADD_SCREEN_PRINTF_OUT_METHOD;
 
     int if_pt_in_fov( const Eigen::Matrix<double, 3, 1> &pt )
@@ -882,7 +883,6 @@ class Laser_mapping
         std::string                                        json_file_name;
         int                                                curren_frame_idx;
         std::vector<std::shared_ptr<Maps_keyframe<float>>> keyframe_vec;
-        Scene_alignment<float>                             scene_align;
         Mapping_refine<PointType>                          map_rfn;
         std::vector<std::string>                           m_filename_vec;
 
@@ -893,9 +893,9 @@ class Laser_mapping
 
         float avail_ratio_plane = 0.05; // 0.05 for 300 scans, 0.15 for 1000 scans
         float avail_ratio_line = 0.03;
-        scene_align.init( m_loop_save_dir_name );
-        scene_align.m_accepted_threshold = m_loop_closure_map_alignment_inlier_threshold;
-        scene_align.m_maximum_icp_iteration = m_loop_closure_map_alignment_maximum_icp_iteration;
+        m_scene_align.init( m_loop_save_dir_name );
+        m_scene_align.m_accepted_threshold = m_loop_closure_map_alignment_inlier_threshold;
+        m_scene_align.m_maximum_icp_iteration = m_loop_closure_map_alignment_maximum_icp_iteration;
         // scene_align. =  m_
         PCL_TOOLS::PCL_point_cloud_to_pcd pcd_saver;
         pcd_saver.set_save_dir_name( std::string( m_loop_save_dir_name ).append( "/pcd" ) );
@@ -1031,27 +1031,27 @@ class Laser_mapping
                     {
                         continue;
                     }
-                    scene_align.set_downsample_resolution( m_loop_closure_map_alignment_resolution, m_loop_closure_map_alignment_resolution );
-                    scene_align.m_para_scene_alignments_maximum_residual_block = m_para_scene_alignments_maximum_residual_block;
-                    double icp_score = scene_align.find_tranfrom_of_two_mappings( last_keyframe, keyframe_vec[ his ], m_loop_closure_map_alignment_if_dump_matching_result );
+                    m_scene_align.set_downsample_resolution( m_loop_closure_map_alignment_resolution, m_loop_closure_map_alignment_resolution );
+                    m_scene_align.m_para_scene_alignments_maximum_residual_block = m_para_scene_alignments_maximum_residual_block;
+                    double icp_score = m_scene_align.find_tranfrom_of_two_mappings( last_keyframe, keyframe_vec[ his ], m_loop_closure_map_alignment_if_dump_matching_result );
                     
                     screen_printf( "===============================================\r\n" );
                     screen_printf( "%s -- %s\r\n", m_filename_vec[ keyframe_vec.size() - 1 ].c_str(), m_filename_vec[ his ].c_str() );
-                    screen_printf( "ICP inlier threshold = %lf, %lf\r\n", icp_score, scene_align.m_pc_reg.m_inlier_threshold );
-                    screen_printf( "%s\r\n", scene_align.m_pc_reg.m_final_opt_summary.BriefReport().c_str() );
+                    screen_printf( "ICP inlier threshold = %lf, %lf\r\n", icp_score, m_scene_align.m_pc_reg.m_inlier_threshold );
+                    screen_printf( "%s\r\n", m_scene_align.m_pc_reg.m_final_opt_summary.BriefReport().c_str() );
                     
                     m_logger_loop_closure.printf( "===============================================\r\n" );
                     m_logger_loop_closure.printf( "%s -- %s\r\n", m_filename_vec[ keyframe_vec.size() - 1 ].c_str(), m_filename_vec[ his ].c_str() );
-                    m_logger_loop_closure.printf( "ICP inlier threshold = %lf, %lf\r\n", icp_score, scene_align.m_pc_reg.m_inlier_threshold );
-                    m_logger_loop_closure.printf( "%s\r\n", scene_align.m_pc_reg.m_final_opt_summary.BriefReport().c_str() );
+                    m_logger_loop_closure.printf( "ICP inlier threshold = %lf, %lf\r\n", icp_score, m_scene_align.m_pc_reg.m_inlier_threshold );
+                    m_logger_loop_closure.printf( "%s\r\n", m_scene_align.m_pc_reg.m_final_opt_summary.BriefReport().c_str() );
                     
-                    if ( scene_align.m_pc_reg.m_inlier_threshold > m_loop_closure_map_alignment_inlier_threshold*2 )
+                    if ( m_scene_align.m_pc_reg.m_inlier_threshold > m_loop_closure_map_alignment_inlier_threshold*2 )
                     {
                         his += 10;
                         continue;
                     }
 
-                    if ( scene_align.m_pc_reg.m_inlier_threshold < m_loop_closure_map_alignment_inlier_threshold )
+                    if ( m_scene_align.m_pc_reg.m_inlier_threshold < m_loop_closure_map_alignment_inlier_threshold )
                     {
                         printf( "I believe this is true loop.\r\n" );
                        m_logger_loop_closure.printf( "I believe this is true loop.\r\n" );
@@ -1059,8 +1059,8 @@ class Laser_mapping
                         auto Q_b = pose3d_vec[ pose3d_vec.size() - 1 ].q;
                         auto T_a = pose3d_vec[ his ].p;
                         auto T_b = pose3d_vec[ pose3d_vec.size() - 1 ].p;
-                        auto ICP_q = scene_align.m_pc_reg.m_q_w_curr;
-                        auto ICP_t = scene_align.m_pc_reg.m_t_w_curr;
+                        auto ICP_q = m_scene_align.m_pc_reg.m_q_w_curr;
+                        auto ICP_t = m_scene_align.m_pc_reg.m_t_w_curr;
 
                         ICP_t = ( ICP_q.inverse() * ( -ICP_t ) );
                         ICP_q = ICP_q.inverse();
@@ -1084,7 +1084,7 @@ class Laser_mapping
                         Ceres_pose_graph_3d::pose_graph_optimization( temp_pose_3d_map, constrain_vec_temp );
                         Ceres_pose_graph_3d::OutputPoses( std::string( path_name ).append( "/poses_ori.txt" ), pose3d_map_ori );
                         Ceres_pose_graph_3d::OutputPoses( std::string( path_name ).append( "/poses_opm.txt" ), temp_pose_3d_map );
-                        scene_align.dump_file_name( std::string( path_name ).append( "/file_name.txt" ), map_file_name );
+                        m_scene_align.dump_file_name( std::string( path_name ).append( "/file_name.txt" ), map_file_name );
 
                         loop_closure_pub_optimzed_path( temp_pose_3d_map );
 
@@ -1128,7 +1128,7 @@ class Laser_mapping
 
             screen_out << m_timer.toc_string( "Find loop" ) << std::endl;
 
-            scene_align.dump_file_name( std::string( m_loop_save_dir_name ).append( "/file_name.txt" ), map_file_name );
+            m_scene_align.dump_file_name( std::string( m_loop_save_dir_name ).append( "/file_name.txt" ), map_file_name );
             
             if ( 1 )
             {

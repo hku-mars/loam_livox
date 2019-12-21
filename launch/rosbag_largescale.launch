@@ -10,7 +10,7 @@
     <param name="feature_extraction/mapping_plane_resolution" type="double" value="1.2"/>
 
     <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration">
-     <remap from="/laser_points" to="/livox/lidar" />
+     <remap from="/laser_points_0" to="/livox/lidar" />
     </node>
 
     <node pkg="loam_livox" type="livox_laserMapping" name="livox_laserMapping" output="screen" />

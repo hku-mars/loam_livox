@@ -204,10 +204,9 @@ class Livox_laser
     }
 
     template < typename T >
-    Pt_infos *find_pt_info( const T &pt )
+    Pt_infos *find_pt_info(const T & pt )
     {
         m_map_pt_idx_it = m_map_pt_idx.find( pt );
-        //printf( "Input pt is [%lf, %lf, %lf]\r\n", pt.x, pt.y, pt.z );
         if ( m_map_pt_idx_it == m_map_pt_idx.end() )
         {
             printf( "Input pt is [%lf, %lf, %lf]\r\n", pt.x, pt.y, pt.z );
@@ -227,7 +226,7 @@ class Livox_laser
         pc_full_res.resize( m_pts_info_vec.size() );
         float maximum_idx = maximum_blur * m_pts_info_vec.size();
         float minimum_idx = minimum_blur * m_pts_info_vec.size();
-        int pt_critical_rm_mask = e_pt_000 | e_pt_nan;
+        int pt_critical_rm_mask = e_pt_000 | e_pt_nan | e_pt_too_near;
         for ( size_t i = 0; i < m_pts_info_vec.size(); i++ )
         {
             if ( m_pts_info_vec[ i ].idx > maximum_idx ||
@@ -240,7 +239,7 @@ class Livox_laser
                 {
                     if ( m_pts_info_vec[ i ].pt_type != e_pt_normal )
                         continue;
-                    if ( m_pts_info_vec[ i ].depth_sq2 < std::pow( 30, 2 ) )
+                    if ( m_pts_info_vec[ i ].depth_sq2 < std::pow( 30, 2 )  )
                     {
                         pc_corners.points[ corner_num ] = m_raw_pts_vec[ i ];
                         //set_intensity( pc_corners.points[ corner_num ], e_I_motion_blur );
@@ -259,10 +258,11 @@ class Livox_laser
                     }
                 }
 
-                pc_full_res.points[ full_num ] = m_raw_pts_vec[ i ];
-                pc_full_res.points[ full_num ].intensity = m_pts_info_vec[ i ].time_stamp;
-                full_num++;
+                
             }
+            pc_full_res.points[ full_num ] = m_raw_pts_vec[ i ];
+            pc_full_res.points[ full_num ].intensity = m_pts_info_vec[ i ].time_stamp;
+            full_num++;
         }
 
         //printf("Get_features , corner num = %d, suface num = %d, blur from %.2f~%.2f\r\n", corner_num, surface_num, minimum_blur, maximum_blur);
@@ -274,6 +274,7 @@ class Livox_laser
     template < typename T >
     void set_intensity( T &pt, const E_intensity_type &i_type = e_I_motion_blur )
     {
+        
         Pt_infos *pt_info = find_pt_info( pt );
         switch ( i_type )
         {
@@ -464,12 +465,12 @@ class Livox_laser
         std::vector< int > edge_idx;
         std::vector< int > split_idx;
         scan_id_index.resize( pts_size );
-        edge_idx.clear();
         m_map_pt_idx.clear();
         m_map_pt_idx.reserve( pts_size );
         std::vector< int > zero_idx;
 
         m_input_points_size = 0;
+
         for ( unsigned int idx = 0; idx < pts_size; idx++ )
         {
             m_raw_pts_vec[ idx ] = laserCloudIn.points[ idx ];
@@ -495,6 +496,10 @@ class Livox_laser
                 {
                     // TODO: handle this case.
                     screen_out << "First point should be normal!!!" << std::endl;
+
+                    pt_info->pt_2d_img << 0.01, 0.01;
+                    pt_info->polar_dis_sq2 = 0.0001;
+                    add_mask_of_point( pt_info, e_pt_000 );
                     //return 0;
                 }
                 else
@@ -557,7 +562,6 @@ class Livox_laser
                 }
             }
         }
-
         split_idx.push_back( pts_size - 1 );
 
         int   val_index = 0;
@@ -565,28 +569,34 @@ class Livox_laser
         float scan_angle = 0;
         int   internal_size = 0;
 
+        if( split_idx.size() < 6) // minimum 3 petal of scan.
+            return 0;
+        
         for ( int idx = 0; idx < ( int ) pts_size; idx++ )
         {
-            if ( idx == 0 || idx > split_idx[ val_index + 1 ] )
+            if ( val_index < split_idx.size() - 2 )
             {
-                if ( idx > split_idx[ val_index + 1 ] )
+                if ( idx == 0 || idx > split_idx[ val_index + 1 ] )
                 {
-                    val_index++;
-                }
+                    if ( idx > split_idx[ val_index + 1 ] )
+                    {
+                        val_index++;
+                    }
 
-                internal_size = split_idx[ val_index + 1 ] - split_idx[ val_index ];
+                    internal_size = split_idx[ val_index + 1 ] - split_idx[ val_index ];
 
-                if ( m_pts_info_vec[ split_idx[ val_index + 1 ] ].polar_dis_sq2 > 10000 )
-                {
-                    pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.20 );
-                    scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
-                    scan_angle = scan_angle + 180.0;
-                }
-                else
-                {
-                    pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.80 );
-                    scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
-                    scan_angle = scan_angle + 180.0;
+                    if ( m_pts_info_vec[ split_idx[ val_index + 1 ] ].polar_dis_sq2 > 10000 )
+                    {
+                        pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.20 );
+                        scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
+                        scan_angle = scan_angle + 180.0;
+                    }
+                    else
+                    {
+                        pt_angle_index = split_idx[ val_index + 1 ] - ( int ) ( internal_size * 0.80 );
+                        scan_angle = atan2( m_pts_info_vec[ pt_angle_index ].pt_2d_img( 1 ), m_pts_info_vec[ pt_angle_index ].pt_2d_img( 0 ) ) * 57.3;
+                        scan_angle = scan_angle + 180.0;
+                    }
                 }
             }
             m_pts_info_vec[ idx ].polar_angle = scan_angle;
@@ -673,20 +683,18 @@ class Livox_laser
 
         int remove_point_pt_type = e_pt_000 |
                                    e_pt_too_near |
-                                   e_pt_nan // |
-                                 //e_circle_edge
+                                   e_pt_nan  
+                                //    e_pt_circle_edge
                                    ;
-
+        int scan_avail_num = 0;
+        std::vector< pcl::PointCloud< PointType > > res_laser_cloud_scan;
         for ( unsigned int i = 0; i < laserCloudScans.size(); i++ )
         {
-            //screen_out << "Scan idx = " << i;
-            //screen_out << "  ,length = " << laserCloudScans[ i ].size();
-            //screen_out << "  ,intensity = " << laserCloudScans[ i ].points[ 0 ].intensity << std::endl;
-            int scan_avail_num = 0;
+            scan_avail_num = 0;
+            pcl::PointCloud< PointType > laser_clour_per_scan;
             for ( unsigned int idx = 0; idx < laserCloudScans[ i ].size(); idx++ )
             {
                 if ( ( pts_mask[ i ][ idx ] & remove_point_pt_type ) == 0 )
-                //if(pts_mask[i][idx] == e_normal )
                 {
                     if ( laserCloudScans[ i ].points[ idx ].x == 0 )
                     {
@@ -694,14 +702,20 @@ class Livox_laser
                         assert( laserCloudScans[ i ].points[ idx ].x != 0 );
                         continue;
                     }
-                    laserCloudScans[ i ].points[ scan_avail_num ] = laserCloudScans[ i ].points[ idx ];
-                    set_intensity( laserCloudScans[ i ].points[ scan_avail_num ], default_return_intensity_type );
+                    auto temp_pt = laserCloudScans[ i ].points[ idx ];
+                    set_intensity( temp_pt, default_return_intensity_type );
+                    laser_clour_per_scan.points.push_back(temp_pt);
                     scan_avail_num++;
-                    // cur_pt_idx++;
                 }
             }
-            laserCloudScans[ i ].resize( scan_avail_num );
+
+            //printf(" %d|%d number of point in this scan  = %d ------------------\r\n ", i, laserCloudScans.size(), scan_avail_num);
+            if(scan_avail_num)
+            {
+                res_laser_cloud_scan.push_back(laser_clour_per_scan);
+            }
         }
+        laserCloudScans= res_laser_cloud_scan;
     }
 
     template < typename T >
@@ -726,6 +740,8 @@ class Livox_laser
         std::vector< float >                        scan_id_index;
         laserCloudScans.clear();
         m_map_pt_idx.clear();
+        m_pts_info_vec.clear();
+        m_raw_pts_vec.clear();
         //printf_line;
         if ( m_if_save_pcd_file )
         {

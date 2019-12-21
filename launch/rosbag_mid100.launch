@@ -1,0 +1,25 @@
+<launch>
+    <rosparam command="load" file="$(find loam_livox)/config/performance_precision.yaml" />
+    <param name="common/pcd_save_dir" type="string" value="$(env HOME)/Loam_livox" />
+    <param name="common/log_save_dir" type="string" value="$(env HOME)/Loam_livox" />
+    <param name="common/loop_save_dir" type="string" value="$(env HOME)/Loam_livox" />
+    <param name="common/piecewise_number" type="int" value="2" />
+
+    <param name="common/if_verbose_screen_printf" type="int" value="1"/>
+    <param name="mapping/maximum_pointcloud_delay_time" type="double" value="1.0"/>
+
+    <node pkg="loam_livox" type="livox_scanRegistration" name="livox_scanRegistration" output="screen">
+     <!-- <remap from="/laser_points" to="/livox/lidar" /> -->
+     <remap from="/laser_points_0" to="/livox/lidar_1LVDG1S006J5GZ2" />
+     <remap from="/laser_points_1" to="/livox/lidar_1LVDG1S006J5GZ1" />
+     <remap from="/laser_points_2" to="/livox/lidar_1LVDG1S006J5GZ3" />
+    </node>
+
+    <node pkg="loam_livox" type="livox_laserMapping" name="livox_laserMapping" output="screen" />
+
+    <arg name="rviz" default="true" />
+    <group if="$(arg rviz)">
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find loam_livox)/rviz_cfg/rosbag.rviz" />
+    </group>
+
+</launch>

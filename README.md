@@ -61,10 +61,17 @@ Clone the repository and catkin_make:
     source ~/catkin_ws/devel/setup.bash
 ```
 ## 3. Directly run
-Connect to your PC to Livox LiDAR (mid-40) by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then
+### 3.1 Livox Mid-40
+Connect to your PC to Livox LiDAR (Mid-40) by following  [Livox-ros-driver installation](https://github.com/Livox-SDK/livox_ros_driver), then (launch our algorithm **first**, then livox-ros-driver):
+
 ```
     roslaunch loam_livox livox.launch
+    roslaunch livox_ros_driver livox_lidar.launch
 ```
+### 3.2 Livox Mid-100
+Unfortunately, the default configuration of Livox-ros-driver mix all three lidar point cloud as together, which causes some difficulties in our feature extraction and motion blur compensation. By this, some of the adaptations (modify some configurations) are required to launch our package. 
+
+For more details, please kindly refer our [**tutorials (click me to open)**](./Tutorial_Mid-100.md).
 
 ## 4. Rosbag Example
 ### 4.1. **Common rosbag**
@@ -84,7 +91,7 @@ rosbag play YOUR_DOWNLOADED.bag
 </div>
 
 ### 4.1. **Large-scale rosbag**
-For large scale rosbag (For example [HKUST_01.bag](https://drive.google.com/file/d/1OoAu0WcRhyDsQB9ltPLWeZ2WZlGJz6LO/view?usp=sharing) ), we recommand you launch with bigger line and plane resolution (using *rosbag_largescale.launch*)
+For large scale rosbag (for example, the [HKUST_01.bag](https://drive.google.com/file/d/1OoAu0WcRhyDsQB9ltPLWeZ2WZlGJz6LO/view?usp=sharing) ), we recommand you launch with bigger line and plane resolution (using *rosbag_largescale.launch*)
 ```
 roslaunch loam_livox rosbag_largescale.launch
 rosbag play YOUR_DOWNLOADED.bag
@@ -92,6 +99,16 @@ rosbag play YOUR_DOWNLOADED.bag
 <div align="center">
     <img src="pics/HKUST_01.png" width=45% >
     <img src="pics/HKUST_02.png" width=45% >
+</div>
+
+### 4.2 **Livox Mid-100 example**
+Download our recorded rosbag files ([mid100_example.bag](https://drive.google.com/open?id=1hvjmt4YuGROE-3HWqOfUdofc6zvXxjmU) ), then:
+```
+roslaunch loam_livox rosbag_mid100.launch
+rosbag play mid100_example.bag
+```
+<div align="center">
+    <img src="pics/for_mid100/mid_100_demo.gif" width = 80% >
 </div>
 
 ## 5. Rosbag Example with loop closure enabled
@@ -119,7 +136,16 @@ rosbag play YOUR_DOWNLOADED.bag
 ```
 **NOTICE:** The only difference between launch files "rosbag_loop_simple.launch" and "rosbag_loop.launch" is the minimum number of keyframes (minimum_keyframe_differen) between two candidate frames of loop detection. 
 
-## 6. Our 3D-printable handheld device
+
+## 6. Have troubles in downloading the rosbag files?
+If you have some troubles in downloading the rosbag files form google net-disk (like [issue #33](https://github.com/hku-mars/loam_livox/issues/33)), you can download the same files from [Baidu net-disk](https://pan.baidu.com/s/1nMSJRuP8io8mEqLgACUT_w).
+```
+Link（链接）: https://pan.baidu.com/s/1nMSJRuP8io8mEqLgACUT_w
+Extraction code(提取码): sv9z
+```
+If the share link is disabled, please feel free to email me (ziv.lin.ljr@gmail.com) for updating the link as soon as possible.
+
+## 7. Our 3D-printable handheld device
 To get our following handheld device, please go to another one of our [open source reposity](https://github.com/ziv-lin/My_solidworks/tree/master/livox_handhold), all of the 3D parts are all designed of FDM printable. We also release our solidwork files so that you can freely make your own adjustments.
 
 <div align="center">
@@ -127,10 +153,10 @@ To get our following handheld device, please go to another one of our [open sour
     <img src="pics/system_low_cost.png" width=45% >
 </div>
 
-## 7.Acknowledgments
+## 8.Acknowledgments
 Thanks for LOAM(J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time) LOAM, [LOAM_NOTED](https://github.com/cuitaixiang/LOAM_NOTED), and [A-LOAM](https://github.com/HKUST-Aerial-Robotics/A-LOAM).
 
-## 8. License
+## 9. License
 The source code is released under [GPLv2](http://www.gnu.org/licenses/) license.
 
 We are still working on improving the performance and reliability of our codes. For any technical issues, please contact me via email Jiarong Lin < ziv.lin.ljr@gmail.com >.

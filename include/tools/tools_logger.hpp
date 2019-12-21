@@ -49,7 +49,7 @@
     ( x ).get_ostream()->flush();
 
 #define ADD_SCREEN_PRINTF_OUT_METHOD                                                            \
-    int               m_if_verbose_screen_printf = 0;                                           \
+    int               m_if_verbose_screen_printf = 1;                                           \
     char *            m_sceen_output_cstr = new char[ 10000 ]();                                \
     std::string       m_sceen_output_string = std::string( m_sceen_output_cstr );               \
     std::stringstream m_sceen_output_stringstream = std::stringstream( m_sceen_output_string ); \

@@ -80,11 +80,15 @@ class Laser_feature
     int         m_odom_mode = 0; //0 = for odom, 1 = for mapping
     float       m_plane_resolution;
     float       m_line_resolution;
+    int         m_piecewise_number;
+
+    int m_maximum_input_lidar_pointcloud = 3;
     File_logger m_file_logger;
 
     bool        m_if_pub_each_line = false;
     int         m_lidar_type = 0; // 0 is velodyne, 1 is livox
     int         m_laser_scan_number = 64;
+    std::mutex  m_mutex_lock_handler;
     Livox_laser m_livox;
     ros::Time   m_init_timestamp;
     ADD_SCREEN_PRINTF_OUT_METHOD;
@@ -100,10 +104,13 @@ class Laser_feature
     ros::Publisher              m_pub_pc_surface_flat;
     ros::Publisher              m_pub_pc_surface_less_flat;
     ros::Publisher              m_pub_pc_removed_pt;
-    std::vector<ros::Publisher> m_pub_each_scan;
+    std::vector<ros::Publisher>                                         m_pub_each_scan;
 
-    ros::Subscriber m_sub_input_laser_cloud;
-
+    std::vector<std::string> m_input_lidar_topic_name_vec;
+    std::vector<ros::Subscriber> m_sub_input_laser_cloud_vec;
+    std::vector< std::vector<pcl::PointCloud<pcl::PointXYZI> > >   m_map_pointcloud_full_vec_vec;
+    std::vector< std::vector<pcl::PointCloud<pcl::PointXYZI> > >   m_map_pointcloud_surface_vec_vec;
+    std::vector< std::vector<pcl::PointCloud<pcl::PointXYZI> > >   m_map_pointcloud_corner_vec_vec;
     double m_minimum_range = 0.01;
 
     ros::Publisher            m_pub_pc_livox_corners, m_pub_pc_livox_surface, m_pub_pc_livox_full;
@@ -132,6 +139,7 @@ class Laser_feature
         get_ros_parameter<float>( nh,"feature_extraction/mapping_line_resolution", m_line_resolution, 0.8 );
         get_ros_parameter<double>(nh, "feature_extraction/minimum_range", m_minimum_range, 0.1 );
         get_ros_parameter<int>( nh,"common/if_motion_deblur", m_if_motion_deblur, 1 );
+        get_ros_parameter<int>( nh,"common/piecewise_number", m_piecewise_number, 3 );
         get_ros_parameter<int>(nh, "common/odom_mode", m_odom_mode, 0 );
 
         double livox_corners, livox_surface, minimum_view_angle;
@@ -144,6 +152,7 @@ class Laser_feature
         m_livox.thr_corner_curvature = livox_corners;
         m_livox.thr_surface_curvature = livox_surface;
         m_livox.minimum_view_angle = minimum_view_angle;
+
         //livox.m_livox_min_allow_dis = MINIMUM_RANGE;
 
         screen_printf( "scan line number %d \n", m_laser_scan_number );
@@ -157,9 +166,18 @@ class Laser_feature
 
         m_file_logger.set_log_dir( log_save_dir_name );
         m_file_logger.init( "scanRegistration.log" );
+        m_map_pointcloud_full_vec_vec.resize(m_maximum_input_lidar_pointcloud);
+        m_map_pointcloud_surface_vec_vec.resize(m_maximum_input_lidar_pointcloud);
+        m_map_pointcloud_corner_vec_vec.resize(m_maximum_input_lidar_pointcloud);
 
-        m_sub_input_laser_cloud = nh.subscribe<sensor_msgs::PointCloud2>( "/laser_points", 10000, &Laser_feature::laserCloudHandler, this );
-
+        for(int i = 0 ; i< m_maximum_input_lidar_pointcloud; i++)
+        {
+            m_input_lidar_topic_name_vec.push_back(string("laser_points_").append(std::to_string(i)));
+            m_sub_input_laser_cloud_vec.push_back( nh.subscribe<sensor_msgs::PointCloud2>( m_input_lidar_topic_name_vec.back(), 10000, boost::bind( &Laser_feature::laserCloudHandler, this, _1,  m_input_lidar_topic_name_vec.back()) ) );
+            m_map_pointcloud_full_vec_vec[i].resize(m_piecewise_number);
+            m_map_pointcloud_surface_vec_vec[i].resize(m_piecewise_number);
+            m_map_pointcloud_corner_vec_vec[i].resize(m_piecewise_number);
+        }
         m_pub_laser_pc = nh.advertise<sensor_msgs::PointCloud2>( "/laser_points_2", 10000 );
         m_pub_pc_sharp_corner = nh.advertise<sensor_msgs::PointCloud2>( "/laser_cloud_sharp", 10000 );
         m_pub_pc_less_sharp_corner = nh.advertise<sensor_msgs::PointCloud2>( "/laser_cloud_less_sharp", 10000 );
@@ -221,8 +239,21 @@ class Laser_feature
         cloud_out.is_dense = true;
     }
 
-    void laserCloudHandler( const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg )
+    void laserCloudHandler( const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg, const std::string & topic_name )
     {
+        std::unique_lock<std::mutex> lock(m_mutex_lock_handler);
+        int current_lidar_index = 0;
+        for(int i = 0; i< m_maximum_input_lidar_pointcloud; i++)
+        {
+            if(topic_name.compare(m_input_lidar_topic_name_vec[i]) == 0)
+            {
+                current_lidar_index = i;
+                break;
+            }
+        }
+        assert(current_lidar_index < m_maximum_input_lidar_pointcloud);
+        // std::cout <<"Time: " << laserCloudMsg->header.stamp.toSec() << ", name = " << topic_name << ", idx= " << current_lidar_index << std::endl;
+
         std::vector<pcl::PointCloud<PointType>> laserCloudScans( m_laser_scan_number );
 
         if ( !m_para_systemInited )
@@ -271,10 +302,10 @@ class Laser_feature
                 *    Feature extraction for livox lidar     *
                 ********************************************/
 
-                int piece_wise = 3;
+                int piece_wise = m_piecewise_number;
                 if(m_if_motion_deblur)
                 {
-                    piece_wise = 3;
+                    piece_wise = 1;
                 }
                 vector<float> piece_wise_start( piece_wise );
                 vector<float> piece_wise_end( piece_wise );
@@ -293,13 +324,45 @@ class Laser_feature
 
                 for ( int i = 0; i < piece_wise; i++ )
                 {
+                  pcl::PointCloud<PointType>::Ptr livox_corners( new pcl::PointCloud<PointType>() ),
+                        livox_surface( new pcl::PointCloud<PointType>() ),
+                        livox_full( new pcl::PointCloud<PointType>() );
+                    m_livox.get_features( *livox_corners, *livox_surface, *livox_full, piece_wise_start[ i ], piece_wise_end[ i ] );
+                    m_map_pointcloud_corner_vec_vec[current_lidar_index][i] = *livox_corners;
+                    m_map_pointcloud_surface_vec_vec[current_lidar_index][i] = *livox_surface;
+                    m_map_pointcloud_full_vec_vec[current_lidar_index][i] = *livox_full;
+                    
+                }
+
+                //if(1)
+
+                for ( int i = 0; i < piece_wise; i++ )
+                {
+
+                    ros::Time                       current_time = ros::Time::now();
                     pcl::PointCloud<PointType>::Ptr livox_corners( new pcl::PointCloud<PointType>() ),
                         livox_surface( new pcl::PointCloud<PointType>() ),
                         livox_full( new pcl::PointCloud<PointType>() );
+                    if ( 1 )
+                    {
+                        if ( current_lidar_index != 0 )
+                        {
+                            return;
+                        }
 
-                    m_livox.get_features( *livox_corners, *livox_surface, *livox_full, piece_wise_start[ i ], piece_wise_end[ i ] );
-
-                    ros::Time current_time = ros::Time::now();
+                        for ( int ii = 0; ii < m_maximum_input_lidar_pointcloud; ii++ )
+                        {
+                            *livox_full += m_map_pointcloud_full_vec_vec[ ii ][ i ];
+                            *livox_surface += m_map_pointcloud_surface_vec_vec[ ii ][ i ];
+                            *livox_corners += m_map_pointcloud_corner_vec_vec[ ii ][ i ];
+                        }
+                    }
+                    else
+                    {
+                        *livox_full = m_map_pointcloud_full_vec_vec[ current_lidar_index ][ i ];
+                        *livox_surface = m_map_pointcloud_surface_vec_vec[ current_lidar_index ][ i ];
+                        *livox_corners = m_map_pointcloud_corner_vec_vec[ current_lidar_index ][ i ];
+                    }
 
                     pcl::toROSMsg( *livox_full, temp_out_msg );
                     temp_out_msg.header.stamp = current_time;
