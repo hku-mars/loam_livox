@@ -366,21 +366,21 @@ class Laser_feature
 
                     pcl::toROSMsg( *livox_full, temp_out_msg );
                     temp_out_msg.header.stamp = current_time;
-                    temp_out_msg.header.frame_id = "/camera_init";
+                    temp_out_msg.header.frame_id = "camera_init";
                     m_pub_pc_livox_full.publish( temp_out_msg );
 
                     m_voxel_filter_for_surface.setInputCloud( livox_surface );
                     m_voxel_filter_for_surface.filter( *livox_surface );
                     pcl::toROSMsg( *livox_surface, temp_out_msg );
                     temp_out_msg.header.stamp = current_time;
-                    temp_out_msg.header.frame_id = "/camera_init";
+                    temp_out_msg.header.frame_id = "camera_init";
                     m_pub_pc_livox_surface.publish( temp_out_msg );
 
                     m_voxel_filter_for_corner.setInputCloud( livox_corners );
                     m_voxel_filter_for_corner.filter( *livox_corners );
                     pcl::toROSMsg( *livox_corners, temp_out_msg );
                     temp_out_msg.header.stamp = current_time;
-                    temp_out_msg.header.frame_id = "/camera_init";
+                    temp_out_msg.header.frame_id = "camera_init";
                     m_pub_pc_livox_corners.publish( temp_out_msg );
                     if ( m_odom_mode == 0 ) // odometry mode
                     {
@@ -783,31 +783,31 @@ class Laser_feature
         sensor_msgs::PointCloud2 laserCloudOutMsg;
         pcl::toROSMsg( *laserCloud, laserCloudOutMsg );
         laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
-        laserCloudOutMsg.header.frame_id = "/camera_init";
+        laserCloudOutMsg.header.frame_id = "camera_init";
         m_pub_laser_pc.publish( laserCloudOutMsg );
 
         sensor_msgs::PointCloud2 cornerPointsSharpMsg;
         pcl::toROSMsg( cornerPointsSharp, cornerPointsSharpMsg );
         cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-        cornerPointsSharpMsg.header.frame_id = "/camera_init";
+        cornerPointsSharpMsg.header.frame_id = "camera_init";
         m_pub_pc_sharp_corner.publish( cornerPointsSharpMsg );
 
         sensor_msgs::PointCloud2 cornerPointsLessSharpMsg;
         pcl::toROSMsg( cornerPointsLessSharp, cornerPointsLessSharpMsg );
         cornerPointsLessSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-        cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
+        cornerPointsLessSharpMsg.header.frame_id = "camera_init";
         m_pub_pc_less_sharp_corner.publish( cornerPointsLessSharpMsg );
 
         sensor_msgs::PointCloud2 surfPointsFlat2;
         pcl::toROSMsg( surfPointsFlat, surfPointsFlat2 );
         surfPointsFlat2.header.stamp = laserCloudMsg->header.stamp;
-        surfPointsFlat2.header.frame_id = "/camera_init";
+        surfPointsFlat2.header.frame_id = "camera_init";
         m_pub_pc_surface_flat.publish( surfPointsFlat2 );
 
         sensor_msgs::PointCloud2 surfPointsLessFlat2;
         pcl::toROSMsg( surfPointsLessFlat, surfPointsLessFlat2 );
         surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
-        surfPointsLessFlat2.header.frame_id = "/camera_init";
+        surfPointsLessFlat2.header.frame_id = "camera_init";
         m_pub_pc_surface_less_flat.publish( surfPointsLessFlat2 );
 
         // pub each scam
@@ -818,7 +818,7 @@ class Laser_feature
                 sensor_msgs::PointCloud2 scanMsg;
                 pcl::toROSMsg( laserCloudScans[ i ], scanMsg );
                 scanMsg.header.stamp = laserCloudMsg->header.stamp;
-                scanMsg.header.frame_id = "/camera_init";
+                scanMsg.header.frame_id = "camera_init";
                 m_pub_each_scan[ i ].publish( scanMsg );
             }
         }
