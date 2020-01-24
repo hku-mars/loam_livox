@@ -454,7 +454,7 @@ class Point_cloud_registration
                     }
                 }
                 residual_block_ids = residual_block_ids_temp;
-                delete probability_to_drop;
+                delete[] probability_to_drop;
             }
 
             ceres::Solver::Options options;
