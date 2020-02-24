@@ -81,25 +81,25 @@ class Livox_laser
 
     enum E_point_type
     {
-        e_pt_normal = 0,                      // normal points
-        e_pt_000 = 0x0001 << 0,               // points [0,0,0]
-        e_pt_too_near = 0x0001 << 1,          // points in short range
-        e_pt_reflectivity_low = 0x0001 << 2,  // low reflectivity
-        e_pt_reflectivity_high = 0x0001 << 3, // high reflectivity
-        e_pt_circle_edge = 0x0001 << 4,       // points near the edge of circle
-        e_pt_nan = 0x0001 << 5,               // points with infinite value
-        e_pt_small_view_angle = 0x0001 << 6,  // points with large viewed angle
+        e_pt_normal = 0x0001 << 0,            // normal points
+        e_pt_000 = 0x0001 << 1,               // points [0,0,0]
+        e_pt_too_near = 0x0001 << 2,          // points in short range
+        e_pt_reflectivity_low = 0x0001 << 3,  // low reflectivity
+        e_pt_reflectivity_high = 0x0001 << 4, // high reflectivity
+        e_pt_circle_edge = 0x0001 << 5,       // points near the edge of circle
+        e_pt_nan = 0x0001 << 6,               // points with infinite value
+        e_pt_small_view_angle = 0x0001 << 7,  // points with large viewed angle
     };
 
     enum E_feature_type // if and only if normal point can be labeled
     {
-        e_label_invalid = -1,
-        e_label_unlabeled = 0,
-        e_label_corner = 0x0001 << 0,
-        e_label_surface = 0x0001 << 1,
-        e_label_near_nan = 0x0001 << 2,
-        e_label_near_zero = 0x0001 << 3,
-        e_label_hight_intensity = 0x0001 << 4,
+        e_label_invalid = 0x0001 << 0,
+        e_label_unlabeled = 0x0001 << 1,
+        e_label_corner = 0x0001 << 2,
+        e_label_surface = 0x0001 << 3,
+        e_label_near_nan = 0x0001 << 4,
+        e_label_near_zero = 0x0001 << 5,
+        e_label_hight_intensity = 0x0001 << 6,
     };
 
     // Encode point infos using points intensity, which is more convenient for debugging.
